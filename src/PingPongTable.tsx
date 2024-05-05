@@ -32,7 +32,7 @@ type GLTFResult = GLTF & {
 // type ContextType = Record<string, React.ForwardRefExoticComponent<JSX.IntrinsicElements['mesh']>>
 
 export function Table(props: JSX.IntrinsicElements['group']) {  
-  const { nodes, materials } = useGLTF('public/models/table_tennis_table.glb') as GLTFResult
+  const { nodes, materials } = useGLTF('/models/table_tennis_table.glb') as GLTFResult
   
   return (
     <RigidBody position={[0, 1.5, 0]} type="fixed" restitution={1} onCollisionEnter={({ manifold }) => {
@@ -60,4 +60,4 @@ export function Table(props: JSX.IntrinsicElements['group']) {
   )
 }
 
-useGLTF.preload('public/models/table_tennis_table.glb')
+useGLTF.preload('/models/table_tennis_table.glb')
