@@ -34,7 +34,7 @@ type GLTFResult = GLTF & {
 }
 
 const Paddle = ({ position, isPlayer }: { position?: Vector3, isPlayer?: boolean }) => {
-  const { nodes, materials } = useGLTF('/models/ping_pong_paddle.glb') as GLTFResult
+  const { nodes, materials } = useGLTF('./models/ping_pong_paddle.glb') as GLTFResult
   const dispatch = useGameDispatch();
   // Can add controls
   const paddleRef = useRef<RapierRigidBody>(null);
@@ -63,6 +63,6 @@ const Paddle = ({ position, isPlayer }: { position?: Vector3, isPlayer?: boolean
   )
 }
 
-useGLTF.preload('/models/ping_pong_paddle.glb')
+useGLTF.preload('./models/ping_pong_paddle.glb')
 
 export default Paddle;
