@@ -35,11 +35,7 @@ export function Table(props: JSX.IntrinsicElements['group']) {
   const { nodes, materials } = useGLTF('/models/table_tennis_table.glb') as GLTFResult
   
   return (
-    <RigidBody position={[0, 1.5, 0]} type="fixed" restitution={1} onCollisionEnter={({ manifold }) => {
-      console.log(
-        "Collision at world position ",
-        manifold.solverContactPoint(0)
-      );}}>
+    <RigidBody position={[0, 1.5, 0]} type="fixed" restitution={1}>
     <mesh>
     <group {...props} dispose={null} position={[0, -1.4, 0]}>
       {/* Table top */}
