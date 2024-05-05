@@ -80,14 +80,14 @@ const GameState = () => {
     return (
         <group position={[0, 3, 0]}>
             <Center position={[-3, 0, 0]}>
-                <Text3D font={'/lato_black.json'} size={0.5}>
+                <Text3D font={'./fonts/lato_black.json'} size={0.5}>
                     P1 - {player1}
                     <meshStandardMaterial color="black" />
                 </Text3D>
             </Center>
 
             <Center position={[3, 0, 0]}>
-                <Text3D font={'/lato_black.json'} size={0.5}>
+                <Text3D font={'./fonts/lato_black.json'} size={0.5}>
                     P2 - {player2}
                     <meshStandardMaterial color={"black"} />
                 </Text3D>
