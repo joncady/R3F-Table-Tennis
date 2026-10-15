@@ -11,7 +11,8 @@ try{
  const host=await open('host');const phone=await open('phone');
  const ready=next(host,'status',m=>m.connected);phone.send(JSON.stringify({type:'hello'}));await ready;
  host.on('message',raw=>{const m=JSON.parse(raw);if(m.type==='probe')host.send(JSON.stringify(m));});
- const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',seq:1,x:.4,y:-.2,yaw:.3,pitch:.1,roll:0,q:[0,0,0,1],swing:[.2,0,-.1]}));const pose=await motion;assert.deepEqual(pose.swing,[.2,0,-.1]);assert.equal(pose.seq,1);
+ const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',sentAt:1234.5,seq:1,x:.4,y:-.2,yaw:.3,pitch:.1,roll:0,q:[0,0,0,1],swing:[.2,0,-.1]}));const pose=await motion;assert.deepEqual(pose.swing,[.2,0,-.1]);assert.equal(pose.seq,1);assert.equal(pose.sentAt,1234.5);
+ const pause=next(host,'pause');phone.send(JSON.stringify({type:'pause'}));await pause;
  const impact=next(phone,'impact');host.send(JSON.stringify({type:'impact',strength:.7}));assert.equal((await impact).strength,.7);
  const toss=next(host,'toss');phone.send(JSON.stringify({type:'toss'}));await toss;
  const rtt=[];for(let id=1;id<=10;id++){const response=next(phone,'probe',m=>m.id===id),sent=performance.now();phone.send(JSON.stringify({type:'probe',id,sent}));await response;rtt.push(performance.now()-sent);}
@@ -20,5 +21,5 @@ try{
  await new Promise(r=>setTimeout(r,5000));host.off('message',listener);console.log(`Received ${new Set(received).size}/30 motion packets`);assert.equal(new Set(received).size,30);
  const disconnected=next(host,'status',m=>!m.connected);phone.close();await disconnected;
  const rejected=await fetch(`${http}/session`,{method:'POST',headers:{Origin:'https://unrelated.example'}});assert.equal(rejected.status,403);
- rtt.sort((a,b)=>a-b);console.log(JSON.stringify({passed:true,tests:['public pairing','CA-trusted WSS','orientation and acceleration','impact feedback','toss','bidirectional probe','30 motion packets at ~60Hz','disconnect','origin restrictions'],roundTripMs:{min:Math.round(rtt[0]),median:Math.round(rtt[5]),max:Math.round(rtt.at(-1))},motionPackets:received.length,outOfOrder:received.some((v,i)=>i>0&&v<received[i-1])},null,2));
+ rtt.sort((a,b)=>a-b);console.log(JSON.stringify({passed:true,tests:['public pairing','CA-trusted WSS','orientation and acceleration','impact feedback','toss','pause','source timestamps','bidirectional probe','30 motion packets at ~60Hz','disconnect','origin restrictions'],roundTripMs:{min:Math.round(rtt[0]),median:Math.round(rtt[5]),max:Math.round(rtt.at(-1))},motionPackets:received.length,outOfOrder:received.some((v,i)=>i>0&&v<received[i-1])},null,2));
 }finally{for(const ws of connections)ws.close();}

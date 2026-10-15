@@ -104,7 +104,7 @@ On Android: scan the QR, tap **Connect & enable motion**, hold the phone in your
 Hold still for the first prompt, then make a short movement toward YOUR RIGHT
 when asked. Gravity defines up; this explicit gesture defines sideways. Allow
 motion sensors if prompted. Test impact sound/vibration using the phone button.
-On desktop choose **Use phone**, then **Back to the table**. Phone Toss starts
+On desktop choose **Start with phone** or **Continue with phone** to enter play directly. A connected controller is shown as **Edit phone pairing**. Phone Pause/resume can also enter or resume the game without a desktop click. Phone Toss starts
 or tosses, and Pause toggles pause. Keyboard A/D and W/S still move your body.
 Sound is synthesized on the phone; vibration is capability-detected and may
 also depend on Android/Chrome settings. Keep the controller page visible.
@@ -113,10 +113,10 @@ The phone now estimates short-window hand displacement from acceleration,
 independently of the calibrated 1:1 face orientation. It still does not provide
 absolute 6-DoF tracking or an anatomically rigged wrist/backhand.
 Motion is transmitted at up to ~60 Hz. Calibrated quaternions drive the face
-orientation 1:1 without the mouse backhand flip or additional rotation smoothing.
+orientation with 1:1 angular gain, without the mouse backhand flip. Network interpolation adds a small temporal delay while preserving the calibrated rotation endpoints.
 Phone-mode collision uses that same rotated face, including held-ball clearance.
 Reach uses 2× sensitivity by default (adjust Phone reach in the pause menu),
-without the former position smoothing and with a faster arm movement limit.
+with a faster arm movement limit. See network interpolation below.
 If the phone does not expose acceleration, tilt-based reach remains a fallback.
 The existing paddle velocity/spin model remains active. Valid player paddle contacts send one feedback event
 with bounded strength. Disconnects, stale samples, and a hidden phone page pause
@@ -241,3 +241,44 @@ Initial synthetic cloud validation after increasing relay headroom received
 30/30 packets sent at ~60 Hz. Ten echo round trips measured 117–182 ms, median
 153 ms, from this computer; these are not Android latency measurements.
 Packets arrived out of order in the burst, so sequence rejection is enabled.
+
+### Network interpolation and motion limits
+
+Phone samples carry a monotonic source timestamp. Both relays preserve it; the
+host rejects old sequence numbers and interpolates using sample time instead
+of packet arrival time. A 28–80 ms adaptive buffer absorbs packet bunching.
+Shortest-arc normalized quaternion interpolation retains 1:1 angular endpoints.
+A small frame-time-independent correction filter softens recovery after gaps.
+Only translation can predict ahead: at most 25 ms and 3 cm per sensor axis
+before reach gain. Orientation is never extrapolated. Gaps hold the last pose
+rather than snapping the paddle to neutral; the existing one-second stale-data
+pause still applies. Phone-side queued motion is dropped before it builds a
+backlog. Reload the phone and desktop after deploying; older controllers still
+work using arrival timestamps.
+
+`tests/phone-motion.test.mjs` compares a synthetic sinusoidal stroke under
+packet bunching: discrete acceleration spikes fell 95%, with maximum unscaled
+trajectory error 7.2 cm. This is a synthetic smoothness/lag test, not measured
+Android tracking accuracy. The added buffer trades some responsiveness for
+continuity and cannot fix sustained network latency or inertial drift.
+
+Coaching references reviewed for form:
+[Table Tennis England: forehand/backhand flick](https://newsarchive.tabletennisengland.co.uk/news/archived/coaching-forehand-backhand-flick/)
+and [PingSkills: advanced backhand topspin](https://www.youtube.com/watch?v=TDtxRDnGpPM).
+Their emphasis on forearm/wrist action and upward brushing supports keeping
+face rotation separate from hand translation. We preserve the measured grip
+instead of imposing an automatic backhand flip on phone players. Anatomical
+elbow pivots, body rotation and absolute hand position still need camera or
+other positional references; acceleration alone does not establish them.
+
+### Automated match recording
+
+Open `?demo=agent` and choose **Record agent match**. This records the rendered
+WebGL game at 4× speed to a downloadable 1280×720 WebM, including score and
+explicit automation labels. It is a paddle-input test player, not recorded
+human phone input or an end-to-end network validation. Its deterministic seed
+produces an 11–0 match with 284 player contacts over 666.8 simulation seconds.
+There are no ball or score overrides. `npm test` runs the same full-match test.
+The CPU retains its reaction interval and speed bounds, with a persistent
+placement error per incoming shot instead of continuously perfect tracking.
+Live rallies no longer award arbitrary points after 20 seconds.

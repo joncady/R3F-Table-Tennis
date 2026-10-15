@@ -132,3 +132,6 @@ assert.ok(Math.abs(accelerationHand.paddles[0].z-2.8)<1e-9);
 assert.deepEqual(accelerationHand.paddleRotation,turn,'Linear swing must not change 1:1 orientation');
 assert.equal(accelerationHand.body.x,0);assert.equal(accelerationHand.body.z,4.05);
 console.log('Passed: acceleration offsets control all hand axes independently of face orientation and player body.');
+
+const longRally=new Match();longRally.phase='rally';longRally.timer=20.1;Object.assign(longRally.ball,{x:0,y:5,z:-1,vz:-1,vy:0});longRally.step(1/120,neutral);assert.equal(longRally.phase,'rally','A live rally must not award an arbitrary timeout point');
+console.log('Passed: rallies longer than 20 seconds continue until a real fault.');

@@ -10,7 +10,7 @@ const connect=role=>new Promise((resolve,reject)=>{const endpoint=role==='phone'
 const next=(ws,type,predicate=()=>true)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{ws.off('message',listen);reject(Error(`Timed out waiting for ${type}`));},1500);const listen=raw=>{const m=JSON.parse(raw);if(m.type===type&&predicate(m)){clearTimeout(timer);ws.off('message',listen);resolve(m);}};ws.on('message',listen);});
 try{
  const host=await connect('host');const paired=next(host,'status',m=>m.connected);const phone=await connect('phone');assert.equal((await paired).connected,true);
- const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',x:.5,y:-.4,yaw:.3,pitch:.2,roll:0,q:[0,0,0,1],swing:[.1,.2,-.3]}));const packet=await motion;assert.equal(packet.x,.5);assert.deepEqual(packet.q,[0,0,0,1]);assert.deepEqual(packet.swing,[.1,.2,-.3]);
+ const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',sentAt:1234.5,x:.5,y:-.4,yaw:.3,pitch:.2,roll:0,q:[0,0,0,1],swing:[.1,.2,-.3]}));const packet=await motion;assert.equal(packet.x,.5);assert.equal(packet.sentAt,1234.5);assert.deepEqual(packet.q,[0,0,0,1]);assert.deepEqual(packet.swing,[.1,.2,-.3]);
  const suspended=next(host,'suspend');phone.send(JSON.stringify({type:'suspend'}));await suspended;
  const toss=next(host,'toss');phone.send(JSON.stringify({type:'toss'}));await toss;
  const hit=next(phone,'impact');host.send(JSON.stringify({type:'impact',strength:20}));assert.equal((await hit).strength,1);

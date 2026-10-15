@@ -46,7 +46,7 @@ exports.handler=async event=>{
   let m;try{m=JSON.parse(event.body);}catch{return reply(400,{error:'Invalid JSON'});}
   const peer=c.role==='host'?r.phoneId:r.hostId;
   if(m.type==='hello'){await Promise.all([send(id,{type:'status',connected:Boolean(peer)}),send(peer,{type:'status',connected:true})]);}
-  else if(c.role==='phone'&&m.type==='motion'&&motion(m))await send(peer,{type:'motion',x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(m.seq!==undefined?{seq:m.seq}:{})});
+  else if(c.role==='phone'&&m.type==='motion'&&motion(m))await send(peer,{type:'motion',...(Number.isFinite(m.sentAt)&&m.sentAt>=0?{sentAt:m.sentAt}:{}),x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(m.seq!==undefined?{seq:m.seq}:{})});
   else if(c.role==='phone'&&['toss','pause','recenter','suspend'].includes(m.type))await send(peer,{type:m.type});
   else if(c.role==='host'&&m.type==='impact'&&Number.isFinite(m.strength))await send(peer,{type:'impact',strength:Math.max(0,Math.min(1,m.strength))});
   else if(m.type==='probe'&&Number.isFinite(m.sent)&&Number.isSafeInteger(m.id))await send(peer,{type:'probe',sent:m.sent,id:m.id});

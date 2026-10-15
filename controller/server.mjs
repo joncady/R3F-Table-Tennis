@@ -68,7 +68,7 @@ function sockets(server){const wss=new WebSocketServer({server,maxPayload:2048})
    if(Date.now()-lastMotion<12||!['x','y','yaw','pitch','roll'].every(k=>Number.isFinite(m[k])&&Math.abs(m[k])<=4))return;
    if(m.q!==undefined&&(!Array.isArray(m.q)||m.q.length!==4||!m.q.every(n=>Number.isFinite(n)&&Math.abs(n)<=1.01)||Math.abs(Math.hypot(...m.q)-1)>.05))return;
    if(m.swing!==undefined&&(!Array.isArray(m.swing)||m.swing.length!==3||!m.swing.every(n=>Number.isFinite(n)&&Math.abs(n)<=1)))return;
-   lastMotion=Date.now();for(const c of room.clients)if(c.role==='host')send(c,{type:'motion',x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(Number.isSafeInteger(m.seq)?{seq:m.seq}:{})});
+   lastMotion=Date.now();for(const c of room.clients)if(c.role==='host')send(c,{type:'motion',...(Number.isFinite(m.sentAt)&&m.sentAt>=0?{sentAt:m.sentAt}:{}),x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(Number.isSafeInteger(m.seq)?{seq:m.seq}:{})});
   }else if(m.type==='probe'&&Number.isFinite(m.sent)&&Number.isSafeInteger(m.id)){for(const c of room.clients)if(c!==socket)send(c,{type:'probe',id:m.id,sent:m.sent});
   }else if(role==='phone'&&['toss','pause','recenter','suspend'].includes(m.type)){for(const c of room.clients)if(c.role==='host')send(c,{type:m.type});}
   else if(role==='host'&&m.type==='impact'&&Number.isFinite(m.strength)){for(const c of room.clients)if(c.role==='phone')send(c,{type:'impact',strength:Math.max(0,Math.min(1,m.strength))});}

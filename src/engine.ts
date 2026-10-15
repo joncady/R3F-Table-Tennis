@@ -51,13 +51,15 @@ export class Match {
  backhand = false;
  impactSequence = 0;
  impactStrength = 0;
- constructor(handedness: 'left' | 'right' = 'right') {
+ constructor(handedness: 'left' | 'right' = 'right', private random:()=>number = Math.random) {
   this.handedness = handedness;
   this.paddles[0].x = handedness === 'right' ? .55 : -.55;
   this.holdBall();
  }
  setHand(hand: 'left' | 'right') { this.handedness = hand; this.backhand = false; this.paddles[0].x = this.body.x + (hand === 'right' ? .55 : -.55); this.holdBall(); }
 
+ // A consistent, bounded placement error per incoming shot avoids robotic perfect tracking.
+ aiShot = -1; aiError = {x:0,y:0};
  score = [0, 0]; phase: Phase = 'ready'; server: Side = 0; winner: Side | null = null;
  ball: BallState = { x: 0, y: 2, z: 3.1, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0 };
  brush = { x: 0, y: 0 };
@@ -103,7 +105,7 @@ export class Match {
   if (side === this.last) { this.point(other(side), 'double hit'); return; }
   if (!this.bounces || (this.serving && this.bounces < 2)) { this.point(other(side), 'volley before the bounce'); return; }
   const b = this.ball; const p = this.paddles[side];
-  const targetX = side === 0 ? Math.max(-1.25, Math.min(1.25, p.x * .45 + (b.x - p.x) * 1.2 + p.vx * .16)) : (Math.random() - .5) * 2.2;
+  const targetX = side === 0 ? Math.max(-1.25, Math.min(1.25, p.x * .45 + (b.x - p.x) * 1.2 + p.vx * .16)) : (this.random() - .5) * 2.2;
   const targetZ = side === 0 ? -1.65 : 1.65;
   // Use the same brush sample for shot pace and spin.
   const strokeSpeed = side === 0 ? Math.hypot(this.brush.x, this.brush.y, Math.max(0, -p.vz)) : 0;
@@ -177,7 +179,8 @@ export class Match {
     flyBall(predicted, Math.min(1 / 120, time - elapsed));
     if (oldY > 1.58 && predicted.y <= 1.58 && predicted.vy < 0 && Math.abs(predicted.x) <= 1.58 && Math.abs(predicted.z) <= 2.78) bounceBall(predicted);
    }
-   this.aiTarget = time > 0 ? { x: Math.max(-1.7, Math.min(1.7, predicted.x + (Math.random() - .5) * .22)), y: Math.max(.9, Math.min(3, predicted.y)) } : { x: 0, y: 1.9 };
+   if(time>0&&this.aiShot!==this.impactSequence){this.aiShot=this.impactSequence;this.aiError={x:(this.random()+this.random()+this.random()-1.5)*.45,y:(this.random()+this.random()-1)*.16};}
+   this.aiTarget = time > 0 ? { x: Math.max(-1.7, Math.min(1.7, predicted.x + this.aiError.x)), y: Math.max(.9, Math.min(3, predicted.y + this.aiError.y)) } : { x: 0, y: 1.9 };
   }
   const ai = this.paddles[1]; ai.x = move(ai.x, this.aiTarget.x, 2.6); ai.y = move(ai.y, this.aiTarget.y, 2.8);
   flyBall(b, dt);
@@ -222,6 +225,6 @@ export class Match {
     if (Math.hypot((x - px) / .455, (y - py) / .43) <= 1) { b.x = x; b.y = y; b.z = plane; this.hit(side); }
    }
   }
-  if (b.y < .1 || Math.abs(b.x) > 5 || Math.abs(b.z) > 4.6 || this.timer > 20) this.point(this.bounces >= (this.serving ? 2 : 1) ? this.last : other(this.last), 'missed return');
+  if (b.y < .1 || Math.abs(b.x) > 5 || Math.abs(b.z) > 4.6) this.point(this.bounces >= (this.serving ? 2 : 1) ? this.last : other(this.last), 'missed return');
  }
 }
