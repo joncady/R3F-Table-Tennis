@@ -282,3 +282,49 @@ There are no ball or score overrides. `npm test` runs the same full-match test.
 The CPU retains its reaction interval and speed bounds, with a persistent
 placement error per incoming shot instead of continuously perfect tracking.
 Live rallies no longer award arbitrary points after 20 seconds.
+
+### Virtual-phone tracking lab
+
+Open `?lab=phone` to compare a known 3D phone path (white), the previous
+tracker (orange), and the tuned tracker (lime). Play, pause, scrub and orbit
+the scene. `npm run trial:simulate` regenerates the synthetic report; dev and
+build generate it automatically. Only synthetic data is included publicly.
+
+The virtual device follows analytically differentiated minimum-jerk straight
+and curved paths. Its orientation changes independently. Acceleration is
+expressed in device-local axes, with configurable bias, noise, gravity fallback,
+small gravity-error perturbations and irregular sample intervals. The same
+`accelerationInNeutral` conversion used by Android reconstructs these samples
+before the production tracker processes them. Calibrated axes and orientation
+are assumed; this is a physical sensor simulation, not an Android OS emulator.
+Network interpolation remains covered by the separate jitter-buffer tests.
+
+The tuned tracker preserves sample intervals up to the existing gap threshold,
+uses trapezoidal acceleration/velocity integration and a faster acceleration
+filter, and detects linear rest independently of wrist rotation. Marginal noise
+decays the rest timer rather than repeatedly clearing it; clear motion resets it
+immediately. Calibration, bounded speed/reach, 1:1 orientation and the sustained
+integration drift guard remain. An aggressively loosened version improved ideal
+trials but saturated on real recorded input, so it was rejected.
+
+Before game gain, representative synthetic results:
+
+| Trial | Previous | Tuned |
+| --- | ---: | ---: |
+| Known 50 cm lateral span: estimated span | 40.4 cm | 49.8 cm |
+| Slow sweep: position RMS error | 23.84 cm | 8.54 cm |
+| Irregular 30 Hz: position RMS error | 19.38 cm | 6.04 cm |
+| 20 fresh mixed cases: mean position RMS error | 16.02 cm | 7.43 cm |
+
+`npm test` covers 14 named virtual cases and 20 fresh mixed variants, plus the
+previous game/sensor/network tests. Sixteen additional development variants
+are summarized in the generated report. These are synthetic errors, not real
+Android accuracy claims. Constant-velocity travel, unknown initial velocity,
+orientation/gravity errors and absolute position remain ambiguous from an IMU
+alone. Long continuous motion still trades tracking fidelity for drift control.
+
+`npm run trial:compare` reprocesses the newest complete real trial locally,
+showing span and game-range clipping for both trackers. The saved real trial
+used during this tuning had zero natural-swing samples beyond the default
+game range in both conservative versions; this checks saturation, not physical
+accuracy. Reload both devices and recalibrate after updating.

@@ -34,3 +34,5 @@ public/replays/
 public/controller.html
 public/swing.mjs
 cloud/template.generated.json
+
+public/synthetic-trials.json

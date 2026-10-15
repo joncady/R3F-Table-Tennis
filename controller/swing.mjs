@@ -4,13 +4,23 @@ export function rotateVector(v,q){
  const tx=2*(y*vz-z*vy),ty=2*(z*vx-x*vz),tz=2*(x*vy-y*vx);
  return [vx+w*tx+y*tz-z*ty,vy+w*ty+z*tx-x*tz,vz+w*tz+x*ty-y*tx];
 }
+// Shared by Android event handling and virtual-device trials.
+export function accelerationInNeutral(linear,gravity,q,neutral){
+ if(linear?.length===3&&linear.every(Number.isFinite))return rotateVector(linear,q);
+ if(gravity?.length===3&&gravity.every(Number.isFinite)){
+  const measured=rotateVector(gravity,q);
+  const expected=rotateVector([0,0,9.80665],[-neutral[0],-neutral[1],-neutral[2],neutral[3]]);
+  return measured.map((v,i)=>v-expected[i]);
+ }
+ return null;
+}
 export class SwingTracker {
  constructor(){this.reset();}
  reset(){this.bias=[0,0,0];this.filtered=[0,0,0];this.velocity=[0,0,0];this.offset=[0,0,0];this.calibration=0;this.quiet=0;this.stroke=0;this.samples=0;}
  update(acceleration,dt,angularSpeed=0){
-  if(!acceleration.every(Number.isFinite)||!Number.isFinite(dt)||dt<=0)return [...this.offset];
-  if(dt>.12){this.velocity.fill(0);this.filtered.fill(0);this.offset.fill(0);this.stroke=0;return [...this.offset];}
-  dt=Math.min(dt,.04);
+  if(!Array.isArray(acceleration)||acceleration.length!==3||!acceleration.every(Number.isFinite)||!Number.isFinite(dt)||dt<=0||!Number.isFinite(angularSpeed))return [...this.offset];
+  if(dt>.12){this.velocity.fill(0);this.filtered.fill(0);this.offset.fill(0);this.stroke=0;this.quiet=0;return [...this.offset];}
+  // Preserve elapsed sample time, including irregular 30 Hz sensor delivery.
   if(this.calibration<.4){
    // Reject a moving calibration frame instead of learning a stroke as bias.
    if(Math.hypot(...acceleration)<.45&&angularSpeed<.12){this.calibration+=dt;this.samples++;for(let i=0;i<3;i++)this.bias[i]+=(acceleration[i]-this.bias[i])/this.samples;}
@@ -18,17 +28,24 @@ export class SwingTracker {
    return [...this.offset];
   }
   const raw=acceleration.map((v,i)=>Math.max(-25,Math.min(25,v-this.bias[i])));
-  const quiet=Math.hypot(...raw)<.3&&angularSpeed<.25;
-  this.quiet=quiet?this.quiet+dt:0;
+  const alpha=1-Math.exp(-dt*40),limits=[.8,.55,.5];
+  const previousFiltered=[...this.filtered];
+  for(let i=0;i<3;i++)this.filtered[i]+=(raw[i]-this.filtered[i])*alpha;
+  // Use filtered translation, not wrist rotation, to recognize rest. A single
+  // noisy sample should not repeatedly restart the quiet timer.
+  const quiet=Math.hypot(...this.filtered)<.16&&Math.hypot(...raw)<.45;
+  this.quiet=quiet?this.quiet+dt:(Math.hypot(...raw)>.6||Math.hypot(...this.filtered)>.28?0:Math.max(0,this.quiet-dt*3));
   this.stroke=quiet?Math.max(0,this.stroke-dt*2):this.stroke+dt;
-  const alpha=1-Math.exp(-dt*22),limits=[.8,.55,.5];
   for(let i=0;i<3;i++){
-   this.filtered[i]+=(raw[i]-this.filtered[i])*alpha;
-   const a=Math.abs(this.filtered[i])<.12?0:this.filtered[i];
+   const average=(previousFiltered[i]+this.filtered[i])*.5;
+   const a=Math.abs(average)<.08?0:average;
+   const previousVelocity=this.velocity[i];
+   // Retain a drift guard for sustained integration; linear rest resets the
+   // stroke independently of wrist rotation. Looser damping failed real replay.
    this.velocity[i]=(this.velocity[i]+a*dt)*Math.exp(-dt*(this.stroke>1.2?6:.65));
    this.velocity[i]=Math.max(-2.5,Math.min(2.5,this.velocity[i]));
-   if(this.quiet>.15)this.velocity[i]=0;
-   this.offset[i]+=this.velocity[i]*dt;
+   if(this.quiet>.3)this.velocity[i]=0;
+   this.offset[i]+=(previousVelocity+this.velocity[i])*.5*dt;
    if(this.quiet>.6)this.offset[i]*=Math.exp(-dt*2.5);
    this.offset[i]=Math.max(-limits[i],Math.min(limits[i],this.offset[i]));
    if(Math.abs(this.offset[i])>=limits[i])this.velocity[i]=0;

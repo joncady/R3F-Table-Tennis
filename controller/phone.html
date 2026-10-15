@@ -1,5 +1,5 @@
 <!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1"><title>Ping Pong · Phone paddle</title><style>body{background:#102a34;color:#eef4ea;font:18px system-ui;margin:0;padding:28px;touch-action:manipulation}main{max-width:500px;margin:auto}h1{font-size:34px}button{font:inherit;background:#d8f47c;color:#102a34;border:0;border-radius:18px;padding:18px;margin:8px 0;width:100%}small,p{line-height:1.6;color:#bdd0d2}#status{color:#d8f47c}label{display:block;margin:18px 0}input{margin-right:10px}#meter{font-family:monospace;font-size:14px}button:disabled{opacity:.4}</style><main><small>TABLE / TENNIS</small><h1>Your phone is the paddle.</h1><p>Hold the phone in your natural left-handed paddle grip. Calibrate by holding still, then making one short movement toward your right when asked. Move your hand to swing; phone rotation controls the paddle face 1:1.</p><p id="status">Not connected</p><button id="connect">Connect & enable motion</button><button id="calibrate" disabled>Calibrate natural grip</button><button id="toss" disabled>Toss / start game</button><button id="pause" disabled>Pause / resume</button><button id="trial" disabled>Start left-handed movement trial</button><p id="trialStatus">Trial: 5 seconds still, 10 seconds left/right while keeping your paddle angle steady, 10 seconds of natural swings, then 6 seconds still. Spoken prompts announce each phase. Use your left hand. Keep the page visible; data saves to your computer.</p><button id="feedback">Test impact feedback</button><label><input id="sound" type="checkbox" checked>Impact sound</label><label><input id="haptic" type="checkbox" checked>Impact vibration</label><p id="network">Phone ↔ game round-trip: waiting…</p><p id="meter">Waiting for sensors…</p><p>Keep this page visible and the screen awake. Recalibrate if your neutral pose drifts. Keyboard A/D and W/S still move your body.</p></main><script type="module">
-import {SwingTracker,rotateVector,gripFrame,mappedRotation} from './swing.mjs';
+import {SwingTracker,rotateVector,gripFrame,mappedRotation,accelerationInNeutral} from './swing.mjs';
 const swingTracker=new SwingTracker();let swing=null,lastMotionTime=0,accelSamples=0,basis=[0,0,0,1],grip=null;
 const $=id=>document.getElementById(id);let socket,audio,neutral,current,lastSent=0,samples=0,wake;
 let trial=null,trialTimer=null,lastTrial=null,lastSpokenStage='';
@@ -17,14 +17,9 @@ function acceleration(event){
  if(!current||!neutral)return;
  const now=performance.now(),dt=lastMotionTime?(now-lastMotionTime)/1000:1/60;lastMotionTime=now;
  const linear=event.acceleration,withGravity=event.accelerationIncludingGravity;
- let sample;
  const q=relative(current,neutral);
- if(linear&&[linear.x,linear.y,linear.z].every(Number.isFinite))sample=rotateVector([linear.x,linear.y,linear.z],q);
- else if(withGravity&&[withGravity.x,withGravity.y,withGravity.z].every(Number.isFinite)){
-  sample=rotateVector([withGravity.x,withGravity.y,withGravity.z],q);
-  const gravity=rotateVector([0,0,9.80665],[-neutral[0],-neutral[1],-neutral[2],neutral[3]]);
-  sample=sample.map((v,i)=>v-gravity[i]);
- }else return;
+ let sample=accelerationInNeutral(linear?[linear.x,linear.y,linear.z]:null,withGravity?[withGravity.x,withGravity.y,withGravity.z]:null,q,neutral);
+ if(!sample)return;
  const rate=event.rotationRate;
  const angular=rate&&[rate.alpha,rate.beta,rate.gamma].every(Number.isFinite)?Math.hypot(rate.alpha,rate.beta,rate.gamma)*Math.PI/180:0;
  if(grip){
