@@ -1,9 +1,9 @@
+/* eslint-disable react-refresh/only-export-components */
 import { RapierRigidBody } from "@react-three/rapier";
 import { createContext, Dispatch, ReactNode, RefObject, useContext, useReducer } from "react";
 import { Action, gameStateReducer } from "./reducer";
 
 export enum PlayState {
-    RESET,
     SERVING,
     RALLY
 }
@@ -15,7 +15,7 @@ const defaultState: DefaultState = {
     },
     serving: 'player2',
     started: 'player2',
-    playState: PlayState.RESET
+    playState: PlayState.SERVING
 }
 
 const GameContext = createContext<DefaultState>(defaultState);
@@ -41,7 +41,7 @@ export interface DefaultState {
     playState: PlayState;
     player1Paddle?: RefObject<RapierRigidBody>;
     player2Paddle?: RefObject<RapierRigidBody>;
-    ball?: RefObject<RapierRigidBody>
+    ball?: RefObject<RapierRigidBody>;
 }
 
 export const GameStateProvider = ({ children }: { children: ReactNode }) => {

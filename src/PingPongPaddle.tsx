@@ -43,7 +43,7 @@ const Paddle = ({ position, isPlayer }: { position?: Vector3, isPlayer?: boolean
     if (paddleRef.current) {
       dispatch({ type: 'setPaddleRef', player: isPlayer ? 'player1' : 'player2', mesh: paddleRef})
     }
-  }, []);  
+  }, [dispatch, isPlayer]);
 
   return (
     <RigidBody type="kinematicPosition" ref={paddleRef} position={isPlayer ? undefined : position}>

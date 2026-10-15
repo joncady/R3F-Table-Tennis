@@ -7,7 +7,16 @@
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "node tests/engine.test.mjs && node tests/swing.test.mjs",
+    "controller": "node controller/server.mjs",
+    "test:controller": "node tests/controller.test.mjs",
+    "trial:analyze": "node controller/analyze-trial.mjs",
+    "replay:prepare": "node controller/export-replay.mjs",
+    "predev": "node controller/prepare-phone.mjs",
+    "prebuild": "node controller/prepare-phone.mjs",
+    "cloud:template": "node cloud/template.mjs",
+    "test:cloud": "node tests/cloud-relay.test.mjs"
   },
   "dependencies": {
     "@react-spring/three": "^9.7.3",
@@ -15,16 +24,23 @@
     "@react-three/fiber": "^8.16.3",
     "@react-three/rapier": "^1.3.1",
     "gsap": "^3.12.5",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
-    "three": "^0.164.1"
+    "three": "^0.164.1",
+    "ws": "^8.22.0"
   },
   "devDependencies": {
+    "@aws-sdk/client-apigatewaymanagementapi": "^3.1152.0",
+    "@aws-sdk/client-dynamodb": "^3.1152.0",
+    "@aws-sdk/lib-dynamodb": "^3.1152.0",
     "@react-spring/types": "^9.7.3",
     "@types/gsap": "^3.0.0",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.2.66",
     "@types/react-dom": "^18.2.22",
     "@types/three": "^0.164.0",
+    "@types/ws": "^8.18.2",
     "@typescript-eslint/eslint-plugin": "^7.2.0",
     "@typescript-eslint/parser": "^7.2.0",
     "@vitejs/plugin-react": "^4.2.1",

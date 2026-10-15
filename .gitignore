@@ -22,3 +22,15 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+controller/.certs/
+
+controller/.trials/
+
+public/replays/
+
+.replay-captures/
+
+public/controller.html
+public/swing.mjs
+cloud/template.generated.json

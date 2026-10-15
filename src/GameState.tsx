@@ -1,7 +1,7 @@
 import { Center, Text3D, useKeyboardControls } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
 import { vec3 } from "@react-three/rapier";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { PlayState, useGame, useGameDispatch } from "./StateProvider";
 import { Controls } from "./constants";
 
@@ -24,12 +24,6 @@ const GameState = () => {
 
     const spacePressed = useKeyboardControls<Controls>(state => state.space);
 
-    // TODO: Add sounds when ball is hit
-    // const playPingPongSound = () => {
-    //     const ping = new Audio(pingSound);
-    //     ping.currentTime = 0;
-    //     ping.play();
-    // }
 
     // TODO: Handle hitting ping pong ball
     // const handlePaddle = () => {
@@ -53,26 +47,30 @@ const GameState = () => {
     //   paddleRef.current.rotation.x = lerp(paddleRef.current.rotation.x, -1, 0.2)
     // }
     // }
+    const values = useRef([false]);
 
     useFrame(({ pointer }) => {
         if (player1Paddle?.current && player2Paddle?.current && ball?.current) {
             // Always track paddle to mouse
-            player1Paddle?.current?.setTranslation(vec3({ x: pointer.x * 10, y: pointer.y * 5, z: 3 }), false)
+            player1Paddle.current?.setTranslation(vec3({ x: pointer.x * 10, y: pointer.y * 5, z: 3 }), false)
 
             // Play state
-            if (playState === PlayState.RESET) {
-                if (spacePressed) {
-                    ball.current.applyImpulse(vec3({ x: 0, y: -0.05, z: 0.05 }), true);
-                    dispatch({ type: 'setGameState', playState: PlayState.SERVING })
+            if (playState === PlayState.SERVING) {
+                ball.current.setBodyType(1, false);
+                const { x, y, z } = player1Paddle.current.translation();
+                ball.current.setTranslation(vec3({ x, y, z: z - 0.5 }), false);
+                if (spacePressed && !values.current[0]) {
+                    console.log("impulse")
+                    // Set to 'dynamic'
+                    ball.current.setBodyType(0, false);
+                    ball.current.applyImpulse(vec3({ x: 0, y: 0.025, z: 0 }), true);
+                    dispatch({ type: 'setGameState', playState: PlayState.RALLY });
+                    values.current[0] = true;
                 }
             } else {
+                values.current[0] = false;
                 // const [x, y, z] = vec3(player1Paddle.current.translation())
                 // ball.current.setTranslation(vec3({ x: x, y: y, z: z - 0.5 }), false);
-                // TODO: Handle serving
-                // if (spacePressed) {
-                //     ball.current.applyImpulse(vec3({ x: 0, y: 0.001, z: 0 }), true)
-                //     dispatch({ type: 'setGameState', playState: PlayState.SERVING })
-                // }       
             }
         }
     });

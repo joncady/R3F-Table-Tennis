@@ -5,7 +5,7 @@ import { DefaultState, PlayState } from "./StateProvider"
 export type Action = |
 {
     type: 'updateScore',
-    player: string
+    player: 'player1' | 'player2'
 } |
 {
     type: 'setBallRef',
@@ -23,8 +23,19 @@ export const gameStateReducer = (state: DefaultState, action: Action): DefaultSt
     switch (action.type) {
         // Score
         case 'updateScore': {
+            if (action.player === 'player1') {
+                state.score.player1 += 1
+            } else {
+                state.score.player2 += 1
+            }
+            if (state.score.player1 + state.score.player2 % 2 === 1) {
+                // TODO: Handle who was serving, alternate every 2
+                state.serving = 'player1';
+            }
+
             return {
-                ...state
+                ...state,
+
             }
         }
         case 'setBallRef': {
