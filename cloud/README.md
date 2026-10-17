@@ -32,11 +32,13 @@ Both local and hosted endpoints use the same browser controller and game path.
 Raw recordings, private CA keys, generated replay data, and screen captures are
 ignored and are not part of the Pages deployment.
 
-## Validate on Android
+## Validate on iPhone or Android
 
-Open the public game on the desktop, choose Pair Android phone, and create a new
-pairing. Scan its QR on Android, Connect, calibrate the natural grip, select Use
-phone on desktop, and resume. Use Test impact feedback on the phone, then verify
+Open the public game on the desktop, choose Pair iPhone / Android, and create a new
+pairing. Scan its QR with either phone. On iPhone, open directly in Safari and allow
+Motion & Orientation after tapping Connect. Calibrate the natural grip and
+choose Start with phone / Continue with phone on desktop. Device detection
+and feedback options adapt automatically. Use Test impact feedback on the phone, then verify
 feedback on real paddle contact. Read the round-trip number during motion.
 The automated cloud test uses synthetic clients on this computer; actual phone
 network conditions and physical feedback still require this manual check.

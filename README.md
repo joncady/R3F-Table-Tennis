@@ -82,11 +82,11 @@ Horizontal paddle travel spans four world units, with a slower return to neutral
 so cross-body backhands are easier. If an embedded browser blocks Pointer Lock,
 open the same local URL in Chrome; the limited-mouse fallback still has screen edges.
 
-## Android motion-controller prototype
+## iPhone / Android motion-controller prototype
 
 Run `npm run controller` in a second terminal alongside `npm run dev`.
 The relay serves HTTP on 8787 and HTTPS/WSS on 8788 on your local network.
-In the game, choose **Pair Android phone → Create pairing**. The generated QR
+In the game, choose **Pair iPhone / Android → Create pairing**. The generated QR
 contains a private room link; keep desktop and phone on the same Wi-Fi.
 
 Android Chrome requires a trusted secure page for motion sensors. Download the
@@ -328,3 +328,116 @@ showing span and game-range clipping for both trackers. The saved real trial
 used during this tuning had zero natural-swing samples beyond the default
 game range in both conservative versions; this checks saturation, not physical
 accuracy. Reload both devices and recalibrate after updating.
+
+### iPhone support and device detection
+
+The controller detects iPhone, iPad (including desktop-style iPad user agents),
+Android, or a generic phone browser. Labels and permission guidance follow that
+detection; capabilities determine behavior. Both device types use the same
+existing motion, calibration, 1:1 orientation and tracking constants.
+
+Use the public HTTPS game, create a pairing, scan its QR with iPhone and open
+the controller directly in Safari. Tap **Connect & enable motion**, allow
+Motion & Orientation, then calibrate. Both sensor permission requests start
+synchronously inside the tap handler, before awaiting audio or network work.
+Audio unlocking is attempted in that gesture too, with webkitAudioContext
+fallback, and cannot block sensor pairing. Denial leaves Connect available for
+retry. Device detection is automatic; browser permission still requires a tap.
+
+Feedback is capability-based: supported browsers can vibrate; otherwise the
+vibration checkbox is disabled and impact sound plus a brief border flash
+remain available. This avoids promising browser haptics on iPhone. Wake lock
+is optional and reacquired when returning to the controller. Hiding the phone
+page still pauses play. Reconnecting ignores stale socket callbacks.
+
+`tests/phone-platform.test.mjs` executes the controller script with iOS and
+Android API doubles, including permission activation, denial, audio startup,
+commands, feedback, reconnect and suspension. This confirms the browser flow,
+not physical iPhone sensor accuracy or speaker/haptic behavior. A real iPhone
+playtest remains required. Public pairing avoids local certificate installation.
+
+References: [Device Orientation and Motion specification](https://w3c.github.io/deviceorientation/),
+[Apple DeviceMotionEvent](https://developer.apple.com/documentation/webkitjs/devicemotionevent),
+and [WebKit vibration API request](https://bugs.webkit.org/show_bug.cgi?id=288846).
+
+## Multiplayer implementation proposal
+
+Status: design only; the shipped game is still singles against the CPU.
+The first multiplayer version should be private, two-player, first to 11/win
+by two. Each player opens a game browser and independently chooses mouse/keyboard
+or a paired iPhone/Android controller. Mixed controllers are supported by design.
+The phone remains a paddle peripheral; each player still needs a game display.
+
+### Authority and transport
+
+Keep GitHub Pages for the browser and phone pages. Add a persistent Node.js
+WebSocket match service on AWS, initially one process in the players' closest
+region. It runs the shared fixed-step simulation, owns ball contacts, serves,
+score and match phase, and publishes snapshots around 20–30 Hz. Inputs arrive
+up to 60 Hz and are consumed at the existing 120 Hz simulation rate. No client
+can award points or send an authoritative ball position. DynamoDB can retain
+room metadata/expiry, but should not be in the per-frame path.
+
+The current API Gateway/Lambda/DynamoDB phone relay connects one display and one
+controller; it cannot be turned into multiplayer by adding a second phone.
+Keep it working during the transition. For multiplayer, direct WSS connections
+to the persistent match service remove the extra phone → relay → browser →
+match-server hop. A Node service behind an AWS Application Load Balancer is one
+TLS/WebSocket deployment option; instance/container sizing and cost should be
+chosen when deploying it. Lambda's finite request lifetime makes it unsuitable
+as the continuously running simulation loop.
+
+### Shared engine changes
+
+`src/engine.ts` currently has one human body/hand/brush/orientation, a hard-coded
+AI serve, and AI-specific return aiming. Refactor these into two PlayerState
+records and `step(dt, [input0, input1])`; move AI into an optional input provider.
+Both seats then share toss/contact, spin, movement bounds, rotated collision and
+serve rules. Preserve singles regression coverage before wiring networking.
+
+Keep physics in one world coordinate frame. The far player's local controls,
+camera, paddle quaternion and spin vectors rotate 180° about the world Y axis,
+so A/D, forward strokes and handedness feel the same from either end. A proper
+rotation, rather than a reflection, preserves spin and handedness conventions.
+
+### Rooms and controller ownership
+
+Lobby: Play CPU / Create private match / Join invite. Each seat has separate
+hand and input settings, a Ready control and its own phone-pairing QR. Player
+seat credentials and phone-controller credentials must be distinct, scoped and
+expiring. Controller credentials cannot claim a different seat or host a match.
+The server infers ownership from the connection, never a client-supplied seat ID.
+
+Keyboard body movement may coexist with a phone paddle. Each seat has exactly
+one active paddle source, switched explicitly while paused/between points, so
+mouse and phone updates cannot fight. Both sources normalize to the existing
+PlayerInput model. Use per-source sequence numbers, source timestamps, versioned
+messages, input limits, and idempotent toss/pause commands. Phone calibration and
+OS detection remain local; full user-agent strings need not be transmitted.
+
+### Latency, interruptions and validation
+
+Predict the local paddle for immediate response; interpolate remote paddles and
+ball snapshots with a short bounded buffer. Reconcile with authoritative server
+ticks and reject old snapshots. Keep collision and scoring on the server. Do not
+start with two browsers independently simulating the ball. Rewind/lag compensation
+can follow only after measuring actual two-player latency and contact errors.
+
+Start only after both seats are ready and their selected controllers are live.
+Pausing, a hidden phone page or a lost active controller pauses the server clock
+and notifies both displays. Resume uses explicit shared readiness. Allow a short
+reconnection grace period using the same seat; switching to mouse is explicit.
+Do not silently substitute the AI during a live rally. Relay impact events only
+to the phone that made the authoritative contact, with event IDs for deduplication.
+
+Implementation sequence: (1) symmetric two-input engine + mirrored tests;
+(2) local authoritative server and private lobby with mouse/mouse; (3) two phone
+slots and mixed control modes; (4) prediction/reconciliation, reconnect and AWS
+deployment. Acceptance covers all mouse/phone combinations, both handedness
+settings, both serve directions, spin signs, full to-11/deuce games, duplicate
+commands, seat isolation, disconnects and jitter. Physical iPhone/Android checks
+remain separate from synthetic socket tests. Public matchmaking, accounts,
+rankings, spectators and mobile-only display play can wait.
+
+AWS references: [ALB WebSocket support](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
+and [Lambda invocation timeout](https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html).

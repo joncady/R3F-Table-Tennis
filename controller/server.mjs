@@ -48,7 +48,7 @@ function handle(req,res){
    }catch{res.writeHead(400);res.end('Invalid trial');}
   });return;
  }
- if(url.pathname==='/swing.mjs'){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(fs.readFileSync(path.join(root,'swing.mjs')));return;}
+ if(['/swing.mjs','/platform.mjs'].includes(url.pathname)){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(fs.readFileSync(path.join(root,url.pathname.slice(1))));return;}
  if(url.pathname==='/ca.crt'){res.writeHead(200,{'Content-Type':'application/x-x509-ca-cert','Content-Disposition':'attachment; filename="ping-pong-local-ca.crt"'});res.end(fs.readFileSync(path.join(certs,'ca.crt')));return;}
  if(url.pathname==='/controller.html'||url.pathname==='/') {res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync(path.join(root,'phone.html')));return;}
  res.writeHead(404);res.end('Not found');

@@ -36,3 +36,5 @@ public/swing.mjs
 cloud/template.generated.json
 
 public/synthetic-trials.json
+
+public/platform.mjs

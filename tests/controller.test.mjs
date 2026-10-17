@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import {WebSocket} from 'ws';
 const origin='http://127.0.0.1:5174';
 const moduleResponse=await fetch('http://127.0.0.1:8787/swing.mjs');assert.equal(moduleResponse.status,200);assert.ok((await moduleResponse.text()).includes('class SwingTracker'));
+const platformResponse=await fetch('http://127.0.0.1:8787/platform.mjs');assert.equal(platformResponse.status,200);assert.match(platformResponse.headers.get('content-type'),/javascript/);assert.match(await platformResponse.text(),/requestSensorAccess/);
 const res=await fetch('http://127.0.0.1:8787/session',{method:'POST',headers:{Origin:origin}});assert.equal(res.status,200);const session=await res.json();
 assert.ok(session.phoneUrl.startsWith('https://'));assert.ok(!session.phoneUrl.includes(session.host));
 const sockets=[];
