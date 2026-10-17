@@ -47,6 +47,9 @@ export function blendRotation(a: Rotation, b: Rotation, t: number): Rotation {
  return q.map(n => n / length) as Rotation;
 }
 export class Match {
+ multiplayer = false;
+ far = {handedness:'right' as 'left'|'right', backhand:false, body:{x:0,z:4.05}, brush:{x:0,y:0}, rotation:[0,0,0,1] as Rotation};
+ impacts = [0,0];
  handedness: 'left' | 'right' = 'right';
  backhand = false;
  impactSequence = 0;
@@ -54,10 +57,25 @@ export class Match {
  constructor(handedness: 'left' | 'right' = 'right', private random:()=>number = Math.random) {
   this.handedness = handedness;
   this.paddles[0].x = handedness === 'right' ? .55 : -.55;
+  this.paddles[1].x=-.55;
   this.holdBall();
  }
  setHand(hand: 'left' | 'right') { this.handedness = hand; this.backhand = false; this.paddles[0].x = this.body.x + (hand === 'right' ? .55 : -.55); this.holdBall(); }
 
+ // Swap the complete court into the other player's local coordinate frame.
+ // This keeps movement, service, brush spin and collision rules identical at both ends.
+ mirror() {
+  for (const p of this.paddles) { p.x=-p.x; p.z=-p.z; p.vx=-p.vx; p.vz=-p.vz; }
+  this.paddles.reverse();
+  const b=this.ball; b.x=-b.x; b.z=-b.z; b.vx=-b.vx; b.vz=-b.vz; b.wx=-b.wx; b.wz=-b.wz;
+  [this.body,this.far.body]=[this.far.body,this.body];
+  [this.brush,this.far.brush]=[this.far.brush,this.brush];
+  [this.paddleRotation,this.far.rotation]=[this.far.rotation,this.paddleRotation];
+  [this.handedness,this.far.handedness]=[this.far.handedness,this.handedness];
+  [this.backhand,this.far.backhand]=[this.far.backhand,this.backhand];
+  this.score.reverse(); this.impacts.reverse(); this.server=other(this.server); this.last=other(this.last);
+  if(this.winner!==null)this.winner=other(this.winner);
+ }
  // A consistent, bounded placement error per incoming shot avoids robotic perfect tracking.
  aiShot = -1; aiError = {x:0,y:0};
  score = [0, 0]; phase: Phase = 'ready'; server: Side = 0; winner: Side | null = null;
@@ -69,8 +87,9 @@ export class Match {
  last: Side = 0; bounces = 0; serving = false; net = false; timer = 0; aiClock = 0; aiTarget = { x: 0, y: 1.9 }; message = 'First to 11 · win by two';
  holdBall() {
   const p = this.paddles[this.phase === 'ready' ? 0 : this.server];
-  const q = this.paddleRotation;
-  const held = this.server === 0 ? localPoint(0,.6,-.22,[-q[0],-q[1],-q[2],q[3]]) : {x:0,y:.6,z:.22};
+  const q = this.server === 0 ? this.paddleRotation : this.far.rotation;
+  const local = localPoint(0,.6,-.22,[-q[0],-q[1],-q[2],q[3]]);
+  const held = this.server === 0 ? local : {x:-local.x,y:local.y,z:-local.z};
   Object.assign(this.ball, { x: p.x + held.x, y: p.y + held.y, z: p.z + held.z, vx: 0, vy: 0, vz: 0, wx: 0, wy: 0, wz: 0 });
  }
  start() { this.phase = 'serve'; this.message = 'Your serve — Space to toss'; }
@@ -83,6 +102,7 @@ export class Match {
  }
  serve() {
   if (this.phase !== 'serve') return;
+  if(this.multiplayer && this.server===1){this.mirror();try{this.serve();}finally{this.mirror();}return;}
   if (this.server === 0) {
    this.holdBall();
    this.ball.vy = 4.4;
@@ -94,6 +114,7 @@ export class Match {
  }
  applyBrush(side: Side) {
   const b = this.ball;
+  this.impacts[side]++;
   if (side === 0) { this.impactSequence++; this.impactStrength = Math.min(1, Math.hypot(this.brush.x, this.brush.y, Math.max(0, -this.paddles[0].vz)) / 10 + .2); }
   const direction = side === 0 ? -1 : 1;
   const clamp = (n: number) => Math.max(-SPIN.max, Math.min(SPIN.max, n));
@@ -102,6 +123,7 @@ export class Match {
   b.wz *= .25;
  }
  hit(side: Side) {
+  if(this.multiplayer && side===1){this.mirror();try{this.hit(0);}finally{this.mirror();}return;}
   if (side === this.last) { this.point(other(side), 'double hit'); return; }
   if (!this.bounces || (this.serving && this.bounces < 2)) { this.point(other(side), 'volley before the bounce'); return; }
   const b = this.ball; const p = this.paddles[side];
@@ -114,12 +136,9 @@ export class Match {
   this.applyBrush(side);
   this.last = side; this.bounces = 0; this.serving = false; this.net = false;
  }
- step(dt: number, input: PlayerInput) {
-  if (this.phase === 'ready') { this.holdBall(); return; }
-  if (this.phase === 'over') return;
-  const move = (value: number, target: number, speed: number) => value + Math.max(-speed * dt, Math.min(speed * dt, target - value));
- const oldRotation = [...this.paddleRotation] as Rotation;
- this.paddleRotation = input.phone && input.orientation ? [...input.orientation] : [0,0,0,1];
+ movePlayer(dt:number,input:PlayerInput){
+ const move = (value:number,target:number,speed:number)=>value+Math.max(-speed*dt,Math.min(speed*dt,target-value));
+ this.paddleRotation=input.phone&&input.orientation?[...input.orientation]:[0,0,0,1];
  const oldBodyX = this.body.x;
  const oldPaddles = this.paddles.map(p => ({ ...p }));
  const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
@@ -140,11 +159,27 @@ export class Match {
  // Mouse strokes sweep the paddle forward, then it returns to its resting reach.
  player.z = move(player.z, this.body.z - 1 + (input.phone && input.swingOffset ? clamp(input.swingOffset[2], -.6, .45) : -Math.min(.32, Math.hypot(player.vx, player.vy) * .035)), input.phone ? 12 : 4);
  player.vz = (player.z - oldPaddles[0].z) / dt;
+ }
+ step(dt: number, input: PlayerInput, secondInput?:PlayerInput) {
+  if(this.multiplayer && this.server===1 && (this.phase==='serve'||this.phase==='toss')){
+   this.mirror();try{this.step(dt,secondInput??{x:0,y:0},input);}finally{this.mirror();}return;
+  }
+  if (this.phase === 'ready') { this.holdBall(); return; }
+  if (this.phase === 'over') return;
+  const move = (value: number, target: number, speed: number) => value + Math.max(-speed * dt, Math.min(speed * dt, target - value));
+ const oldRotation = [...this.paddleRotation] as Rotation;
+ const f=this.far.rotation;const oldFarRotation:Rotation=[f[2],f[3],-f[0],-f[1]];
+ this.paddleRotation = input.phone && input.orientation ? [...input.orientation] : [0,0,0,1];
+ const oldPaddles = this.paddles.map(p => ({...p}));
+ this.movePlayer(dt,input);
+ if(secondInput){this.mirror();try{this.movePlayer(dt,secondInput);}finally{this.mirror();}}
+ const player=this.paddles[0];
+ const clamp = (n:number,low:number,high:number)=>Math.max(low,Math.min(high,n));
  this.timer += dt;
   if (this.phase === 'point') { if (this.timer >= 3) { this.phase = 'serve'; this.timer = 0; this.message = this.server === 0 ? 'Your serve — Space to toss' : 'AI serving…'; } return; }
   if (this.phase === 'serve') {
    this.holdBall();
-   if (this.server === 1 && this.timer > 1.2) this.serve(); return;
+   if (!this.multiplayer && this.server === 1 && this.timer > 1.2) this.serve(); return;
   }
   if (this.phase === 'toss') {
    const b = this.ball;
@@ -169,6 +204,7 @@ export class Match {
    return;
   }
   const b = this.ball; const previous = { ...b };
+  if(!this.multiplayer){
   this.aiClock -= dt;
   if (this.aiClock <= 0) {
    this.aiClock = .14; const time = b.vz < -.1 ? Math.max(0, (-3.05 - b.z) / b.vz) : 0;
@@ -183,6 +219,7 @@ export class Match {
    this.aiTarget = time > 0 ? { x: Math.max(-1.7, Math.min(1.7, predicted.x + this.aiError.x)), y: Math.max(.9, Math.min(3, predicted.y + this.aiError.y)) } : { x: 0, y: 1.9 };
   }
   const ai = this.paddles[1]; ai.x = move(ai.x, this.aiTarget.x, 2.6); ai.y = move(ai.y, this.aiTarget.y, 2.8);
+  }
   flyBall(b, dt);
   // Swept plane crossings prevent fast balls skipping thin surfaces.
   if (previous.y > 1.58 && b.y <= 1.58 && b.vy < 0) {
@@ -203,15 +240,19 @@ export class Match {
   for (const side of [0, 1] as Side[]) {
    // Contact occurs at the paddle face plus the ball radius, not its center.
    const p = this.paddles[side];
-   if (side === 0 && input.phone) {
-    const old = oldPaddles[0];
-    const from = localPoint(previous.x - old.x, previous.y - old.y, previous.z - old.z, oldRotation);
-    const to = localPoint(b.x - p.x, b.y - p.y, b.z - p.z, this.paddleRotation);
+   const sideInput=side===0?input:secondInput;
+   if (sideInput?.phone) {
+    const old = oldPaddles[side];
+    const farQ=this.far.rotation;
+    const currentQ:Rotation=side===0?this.paddleRotation:[farQ[2],farQ[3],-farQ[0],-farQ[1]];
+    const previousQ=side===0?oldRotation:oldFarRotation;
+    const from = localPoint(previous.x - old.x, previous.y - old.y, previous.z - old.z, previousQ);
+    const to = localPoint(b.x - p.x, b.y - p.y, b.z - p.z, currentQ);
     const surface = from.z < 0 ? -.14 : .14;
-    if (b.vz > 0 && (from.z - surface) * (to.z - surface) <= 0 && Math.abs(from.z - to.z) > .00001) {
+    if ((side===0?b.vz>0:b.vz<0) && (from.z - surface) * (to.z - surface) <= 0 && Math.abs(from.z - to.z) > .00001) {
      const t = (from.z - surface) / (from.z - to.z);
      const world = {x:previous.x + (b.x - previous.x) * t,y:previous.y + (b.y - previous.y) * t,z:previous.z + (b.z - previous.z) * t};
-     const local = localPoint(world.x - old.x - (p.x - old.x) * t, world.y - old.y - (p.y - old.y) * t, world.z - old.z - (p.z - old.z) * t, blendRotation(oldRotation, this.paddleRotation, t));
+     const local = localPoint(world.x - old.x - (p.x - old.x) * t, world.y - old.y - (p.y - old.y) * t, world.z - old.z - (p.z - old.z) * t, blendRotation(previousQ, currentQ, t));
      if (Math.hypot(local.x / .455, local.y / .43) <= 1) { Object.assign(b, world); this.hit(side); }
     }
     continue;

@@ -38,3 +38,6 @@ cloud/template.generated.json
 public/synthetic-trials.json
 
 public/platform.mjs
+
+multiplayer/engine.mjs
+multiplayer/template.generated.json

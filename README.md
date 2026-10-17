@@ -360,84 +360,93 @@ References: [Device Orientation and Motion specification](https://w3c.github.io/
 [Apple DeviceMotionEvent](https://developer.apple.com/documentation/webkitjs/devicemotionevent),
 and [WebKit vibration API request](https://bugs.webkit.org/show_bug.cgi?id=288846).
 
-## Multiplayer implementation proposal
+## On-demand private multiplayer
 
-Status: design only; the shipped game is still singles against the CPU.
-The first multiplayer version should be private, two-player, first to 11/win
-by two. Each player opens a game browser and independently chooses mouse/keyboard
-or a paired iPhone/Android controller. Mixed controllers are supported by design.
-The phone remains a paddle peripheral; each player still needs a game display.
+[Open multiplayer](https://joncady.github.io/R3F-Table-Tennis/?multiplayer), or choose
+**Play multiplayer** from the game menu. Create a match using the private launch
+key, share its invite, then have both players choose **Ready / resume**. Each
+player needs a game display and independently chooses mouse/keyboard or a paired
+iPhone/Android paddle. Scan the QR belonging to your own seat. Both displays must
+be ready; on a paired phone **Pause / ready** also readies that seat. Space or
+phone **Toss ball** tosses for the serving player. The match is first to 11,
+win by two, with alternating service and a New game option afterward.
 
-### Authority and transport
+The launch key is in the ignored local file `multiplayer/launch-key.local`; it is
+not embedded in the public frontend or README. Only room creation needs it;
+invited opponents use their private invite. Keep your player URL to reconnect.
+A claimed invite cannot claim another seat. Treat player and phone links as
+passwords. This prototype deliberately permits **one running match server**.
 
-Keep GitHub Pages for the browser and phone pages. Add a persistent Node.js
-WebSocket match service on AWS, initially one process in the players' closest
-region. It runs the shared fixed-step simulation, owns ball contacts, serves,
-score and match phase, and publishes snapshots around 20–30 Hz. Inputs arrive
-up to 60 Hz and are consumed at the existing 120 Hz simulation rate. No client
-can award points or send an authoritative ball position. DynamoDB can retain
-room metadata/expiry, but should not be in the per-frame path.
+### What wakes up, and what shuts down
 
-The current API Gateway/Lambda/DynamoDB phone relay connects one display and one
-controller; it cannot be turned into multiplayer by adding a second phone.
-Keep it working during the transition. For multiplayer, direct WSS connections
-to the persistent match service remove the extra phone → relay → browser →
-match-server hop. A Node service behind an AWS Application Load Balancer is one
-TLS/WebSocket deployment option; instance/container sizing and cost should be
-chosen when deploying it. Lambda's finite request lifetime makes it unsuitable
-as the continuously running simulation loop.
+GitHub Pages serves the game and phone pages. An HTTP API + Lambda + on-demand
+DynamoDB table create and track rooms. Creating a room launches a single ECS
+Fargate task: 0.5 vCPU / 1 GB RAM in Oregon (`us-west-2`). There is no ECS service,
+always-on game instance, load balancer, or NAT gateway. Private scoped tokens
+identify two displays and two optional phone controllers. Gameplay goes directly
+over WSS to the Node server, not through API Gateway/Lambda per frame.
 
-### Shared engine changes
+The server runs the shared simulation at 120 Hz, accepts inputs up to about
+60 Hz, and publishes ordered snapshots at 30 Hz. It owns serving, contacts,
+spin, scoring and both players' movement. The far seat uses a proper 180-degree
+court rotation, preserving handedness, quaternion orientation and spin. The CPU
+is disabled for multiplayer; solo play and its existing phone relay remain.
+The browser interpolates ball/paddle positions; local prediction and lag
+compensation are future work.
 
-`src/engine.ts` currently has one human body/hand/brush/orientation, a hard-coded
-AI serve, and AI-specific return aiming. Refactor these into two PlayerState
-records and `step(dt, [input0, input1])`; move AI into an optional input provider.
-Both seats then share toss/contact, spin, movement bounds, rotated collision and
-serve rules. Preserve singles regression coverage before wiring networking.
+`match.pingpong.kureo.dev` belongs to an isolated delegated DNS zone. Each task
+gets a temporary public IP and serves trusted HTTPS/WSS through Caddy. TLS state
+is encrypted in a private S3 cache for reuse/renewal. Readiness waits for Route 53
+propagation and checks the current task IP with hostname/SNI certificate
+validation. The idle DNS record points to reserved TEST-NET space, avoiding
+negative caching or a dangling record to a reassigned AWS IP. The main
+`kureo.dev` project and its DNS records are unchanged.
 
-Keep physics in one world coordinate frame. The far player's local controls,
-camera, paddle quaternion and spin vectors rotate 180° about the world Y axis,
-so A/D, forward strokes and handedness feel the same from either end. A proper
-rotation, rather than a reflection, preserves spin and handedness conventions.
+Shutdown rules:
 
-### Rooms and controller ownership
+- Both displays gone: 90-second reconnect grace, then exit.
+- Waiting for players or paused: five-minute timeout.
+- Finished game: two minutes to start a rematch.
+- Every task: two-hour lifetime cap.
+- Independent one-minute watchdog: stop stale-heartbeat/orphan tasks and release
+  the active-room lock. The lock is released only after ECS confirms shutdown.
 
-Lobby: Play CPU / Create private match / Join invite. Each seat has separate
-hand and input settings, a Ready control and its own phone-pairing QR. Player
-seat credentials and phone-controller credentials must be distinct, scoped and
-expiring. Controller credentials cannot claim a different seat or host a match.
-The server infers ownership from the connection, never a client-supplied seat ID.
+### Verified results — October 17, 2026
 
-Keyboard body movement may coexist with a phone paddle. Each seat has exactly
-one active paddle source, switched explicitly while paused/between points, so
-mouse and phone updates cannot fight. Both sources normalize to the existing
-PlayerInput model. Use per-source sequence numbers, source timestamps, versioned
-messages, input limits, and idempotent toss/pause commands. Phone calibration and
-OS detection remain local; full user-agent strings need not be transmitted.
+A fresh live AWS task connected over public trusted WSS in **51.9 seconds**
+with its certificate already cached. It accepted synthetic sensor events through
+the actual iPhone and Android controller-page code. A mouse player served legally,
+the phone paddle returned the ball, and its controller received authoritative
+impact feedback. Phone pause/resume, disconnect pause, switching to mouse, ordered
+snapshots, invalid launch-key rejection and the one-server cap passed. After both
+clients closed, ECS reported **STOPPED in 115.8 seconds**, exit code 0, and
+**zero running tasks**, without a manual stop. Startup/shutdown times vary.
 
-### Latency, interruptions and validation
+`npm test` additionally covers a full two-human simulation to 11, both serve
+ends with mouse/phone, mouse/mouse and phone/phone sockets, seat isolation,
+handedness, spin/scoring regressions and local automatic shutdown. These are
+synthetic clients and sensor/API doubles: physical iPhone/Android motion feel,
+real speaker/vibration behavior, cross-network latency and two-person play still
+need hands-on validation. iPhone browser vibration remains unavailable where the
+API is unsupported; sound and visual impact feedback are the fallback.
 
-Predict the local paddle for immediate response; interpolate remote paddles and
-ball snapshots with a short bounded buffer. Reconcile with authoritative server
-ticks and reject old snapshots. Keep collision and scoring on the server. Do not
-start with two browsers independently simulating the ball. Rewind/lag compensation
-can follow only after measuring actual two-player latency and contact errors.
+### Cost and development
 
-Start only after both seats are ready and their selected controllers are live.
-Pausing, a hidden phone page or a lost active controller pauses the server clock
-and notifies both displays. Resume uses explicit shared readiness. Allow a short
-reconnection grace period using the same seat; switching to mouse is explicit.
-Do not silently substitute the AI during a live rally. Relay impact events only
-to the phone that made the authoritative contact, with event IDs for deduplication.
+Game compute is zero when no task is running. Oregon compute plus one public
+IPv4 address is approximately **$0.03 per server-hour**, including startup and
+grace periods, before bandwidth, logs, API/DynamoDB requests and storage. The DNS
+zone has a **$0.50/month** charge; image/certificate storage and the scheduled
+serverless watchdog add small idle costs. This is scale-to-zero game compute,
+not a promise of an entirely zero idle AWS bill. See
+[AWS Fargate pricing](https://aws.amazon.com/fargate/pricing/),
+[IPv4 pricing](https://aws.amazon.com/vpc/pricing/), and
+[DNS pricing](https://aws.amazon.com/route53/pricing/).
 
-Implementation sequence: (1) symmetric two-input engine + mirrored tests;
-(2) local authoritative server and private lobby with mouse/mouse; (3) two phone
-slots and mixed control modes; (4) prediction/reconciliation, reconnect and AWS
-deployment. Acceptance covers all mouse/phone combinations, both handedness
-settings, both serve directions, spin signs, full to-11/deuce games, duplicate
-commands, seat isolation, disconnects and jitter. Physical iPhone/Android checks
-remain separate from synthetic socket tests. Public matchmaking, accounts,
-rankings, spectators and mobile-only display play can wait.
-
-AWS references: [ALB WebSocket support](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-listeners.html)
-and [Lambda invocation timeout](https://docs.aws.amazon.com/lambda/latest/dg/configuration-timeout.html).
+Run `npm run multiplayer` alongside `npm run dev` for local matching at port 8790
+and WSS-equivalent local sockets at 8791; use launch key `local-development`.
+Run `npm run test:multiplayer` for local coverage and
+`npm run test:multiplayer:cloud` for a billable live startup/game/shutdown trial.
+Deployment, DNS setup, private files and operational details are in
+[multiplayer/README.md](multiplayer/README.md). Public matchmaking, accounts,
+rankings, spectators, cross-region placement and migration of active matches
+remain out of scope.

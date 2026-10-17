@@ -1,0 +1,10 @@
+.git
+node_modules
+dist
+controller/.certs
+controller/.trials
+.replay-captures
+public
+*.local
+
+**/*.local

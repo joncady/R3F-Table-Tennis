@@ -42,6 +42,7 @@ jobs:
       - name: Build
         env:
           VITE_RELAY_HTTP: ${{ vars.PING_PONG_RELAY_HTTP }}
+          VITE_MATCH_HTTP: ${{ vars.PING_PONG_MATCH_HTTP }}
         run: npm run build
       - name: Setup Pages
         uses: actions/configure-pages@v4
