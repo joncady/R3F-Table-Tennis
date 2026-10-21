@@ -43,5 +43,7 @@
       "congested": 398
     },
     "stalledTransportMaxQueued": 91
-  }
+  },
+  "servingFixtureSha256": "1c177db0b40973097d97a207ec15d7478480c8cd8d5a62b3ec5cfffa761f5e99",
+  "fixtureNote": "Initial full-match baseline used player.png. Subsequent serving trials use serve.png (same fictional subject with hands in natural serve preparation)."
 }

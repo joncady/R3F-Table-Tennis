@@ -8,12 +8,12 @@ export async function setupWebcam(game,context,request,{relay}={}){
  });
  await game.addInitScript(()=>{
   navigator.mediaDevices.getUserMedia=async()=>{
-   const canvas=document.createElement('canvas');canvas.width=960;canvas.height=640;const ctx=canvas.getContext('2d'),image=new Image();image.src='/R3F-Table-Tennis/lab/fixtures/player.png';await image.decode();
+   const canvas=document.createElement('canvas');canvas.width=640;canvas.height=426;const ctx=canvas.getContext('2d'),image=new Image();image.src='/R3F-Table-Tennis/lab/fixtures/serve.png';await image.decode();
    const {createPuppet}=await import('/R3F-Table-Tennis/lab/puppet.mjs');const puppet=createPuppet(image);window.labArm={x:0,y:0};
    window.labCameraOffset=0;window.labCameraCovered=false;
-   const loop=()=>{ctx.fillStyle='#aaa';ctx.fillRect(0,0,960,640);if(!window.labCameraCovered){if(window.labArm.x||window.labArm.y){puppet.draw(window.labArm.x,window.labArm.y);ctx.drawImage(puppet.canvas,window.labCameraOffset,0,960,640);}else ctx.drawImage(image,window.labCameraOffset,0,960,640);}if(window.labMarkerImage)ctx.drawImage(window.labMarkerImage,20,150,260,260);requestAnimationFrame(loop);};loop();
+   let lastDraw=0;const loop=(now=performance.now())=>{requestAnimationFrame(loop);if(now-lastDraw<66)return;lastDraw=now;ctx.fillStyle='#aaa';ctx.fillRect(0,0,640,426);if(!window.labCameraCovered){if(window.labArm.x||window.labArm.y){puppet.draw(window.labArm.x,window.labArm.y);ctx.drawImage(puppet.canvas,window.labCameraOffset,0,640,426);}else ctx.drawImage(image,window.labCameraOffset,0,640,426);}if(window.labMarkerImage)ctx.drawImage(window.labMarkerImage,10,80,180,180);};loop();
    canvas.style.cssText='position:fixed;bottom:12px;right:12px;width:240px;z-index:9999;border:2px solid #daf77c';document.body.append(canvas);
-   return canvas.captureStream(30);
+   return canvas.captureStream(15);
   };
  });
  await game.goto('?webcam&virtual-player&vision-cpu');const link=game.getByRole('link',{name:'Open controller link'});await link.waitFor();

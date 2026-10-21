@@ -436,11 +436,12 @@ export default function WebcamGame() {
       </header>
       <Canvas
         gl={{ preserveDrawingBuffer: true }}
-        frameloop={paused && !trialRunning ? "never" : "always"}
+        frameloop={paused && !trialRunning ? "demand" : "always"}
       >
         <color attach="background" args={["#102a34"]} />
         <Suspense fallback={null}>
           <Court
+            running={!paused || trialRunning}
             paddleEquipment={equipment}
             frameCount={frameCount}
             paddlePivot={paddlePivot}

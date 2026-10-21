@@ -40,7 +40,7 @@ function Model({ url, size, position,equipment }: { equipment?:Equipment; url: s
  return <primitive object={object} position={position} />;
 }
 
-export function Court({ match, input, update, cameraStrength, phoneActive, phonePose, phoneSensitivity, lateralFollow, impact, samplePhonePose, beforeStep, timeScale=1, networkFrame, bodyControl,paddlePivot=0,frameCount,paddleEquipment, steadyInput=false }: { steadyInput?:boolean; paddleEquipment?:Equipment; frameCount?:React.MutableRefObject<number>; paddlePivot?:number;bodyControl?:React.MutableRefObject<BodyControl>; networkFrame?:()=>void; beforeStep?:(dt:number)=>void; timeScale?:number; samplePhonePose?: (now:number)=>PhonePose|null; lateralFollow: number; phoneSensitivity: number; phoneActive: boolean; phonePose: React.MutableRefObject<PhonePose | null>; impact: (strength: number,opponent?:boolean) => void; cameraStrength: number; match: Match; input: React.MutableRefObject<PlayerInput>; update: () => void }) {
+export function Court({ running=true, match, input, update, cameraStrength, phoneActive, phonePose, phoneSensitivity, lateralFollow, impact, samplePhonePose, beforeStep, timeScale=1, networkFrame, bodyControl,paddlePivot=0,frameCount,paddleEquipment, steadyInput=false }: { running?:boolean; steadyInput?:boolean; paddleEquipment?:Equipment; frameCount?:React.MutableRefObject<number>; paddlePivot?:number;bodyControl?:React.MutableRefObject<BodyControl>; networkFrame?:()=>void; beforeStep?:(dt:number)=>void; timeScale?:number; samplePhonePose?: (now:number)=>PhonePose|null; lateralFollow: number; phoneSensitivity: number; phoneActive: boolean; phonePose: React.MutableRefObject<PhonePose | null>; impact: (strength: number,opponent?:boolean) => void; cameraStrength: number; match: Match; input: React.MutableRefObject<PlayerInput>; update: () => void }) {
  const ball = useRef<Mesh>(null);
  const human = useRef<Group>(null);
  const ai = useRef<Group>(null);
@@ -55,6 +55,12 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
  const sway = useRef({ yaw: 0, pitch: 0, x: 0, y: 0 });
  useFrame((state, delta) => {
   if(frameCount)frameCount.current++;
+  if(!running){
+   state.camera.position.set(match.body.x,2.75,match.body.z+.8);state.camera.rotation.set(-.30,0,0);
+   ball.current?.position.set(match.ball.x,match.ball.y,match.ball.z);if(ball.current)ball.current.visible=match.ballVisible;
+   human.current?.position.set(match.paddles[0].x,match.paddles[0].y,match.paddles[0].z);ai.current?.position.set(match.paddles[1].x,match.paddles[1].y,match.paddles[1].z);
+   return;
+  }
   if(paddleEquipment)match.sponges[0]=paddleEquipment.sponge;
   const pose = samplePhonePose ? samplePhonePose(performance.now()) : phonePose.current;
   if (phoneActive && pose && performance.now() - pose.received < 1000) {

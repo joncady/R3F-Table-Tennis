@@ -1,3 +1,9 @@
+export async function startMouse(page,label='Start game'){
+ await page.getByRole('button',{name:label,exact:true}).last().click();
+ await Promise.race([page.getByRole('button',{name:'Continue with limited mouse'}).waitFor({state:'visible',timeout:20000}),page.getByRole('button',{name:'Pause',exact:true}).waitFor({state:'visible',timeout:20000})]);
+ if(await page.getByRole('button',{name:'Continue with limited mouse'}).isVisible())await page.getByRole('button',{name:'Continue with limited mouse'}).click();
+ await page.getByRole('button',{name:'Pause',exact:true}).waitFor();
+}
 // Oracle observer, ordinary DOM input. No Match methods or live references.
 export async function mousePlayer(page) {
  await page.evaluate(async()=>{
@@ -22,8 +28,9 @@ export async function phonePlayer(game,phone,{duration=60000,fullMatch=false}={}
   const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));window.labPlayerSamples=[];let last=0;
   window.labPlayerTimer=setInterval(()=>{
    const s=window.__labSnapshot;if(!s||s.phase==='over')return;
+   if(s.phase==='point'){window.labArm.x*=.92;window.labArm.y*=.92;return;}
    let target={x:s.paddles[0].x,y:2.2};
-   if(s.phase==='serve'&&s.server===0)target={x:s.ball.x,y:s.ball.y-.4};
+   if(s.phase==='serve'&&s.server===0)target={x:s.ball.x,y:s.ball.y-.25};
    if(s.phase==='toss')target={x:s.ball.x,y:s.timer>.48?Math.min(3.15,s.ball.y):s.ball.y-.65};
    if(s.phase==='rally'&&s.ball.vz>0){const b={...s.ball};for(let t=0;t<2&&b.z<2.95;t+=1/120){const y=b.y;flyBall(b,1/120);if(y>1.58&&b.y<=1.58&&b.vy<0&&Math.abs(b.x)<=1.58&&Math.abs(b.z)<=2.78)bounceBall(b);}target={x:b.x,y:clamp(b.y,1.5,3.1)};}
    window.labArm.x=clamp(window.labArm.x-clamp((target.x-s.paddles[0].x)*.015,-.012,.012),-.27,.18);
@@ -32,9 +39,14 @@ export async function phonePlayer(game,phone,{duration=60000,fullMatch=false}={}
   },50);
  });
  let tossedAt=0,previousAt=Date.now(),previousPosition=[0,0],previousVelocity=[0,0];const began=Date.now();
+ let observedAt=0,advancedAt=Date.now(),serveSince=0,oldScore='';
  while(Date.now()-began<duration){
   const s=await game.evaluate(()=>window.__labSnapshot);if(s?.phase==='over')return s;
-  if(s?.phase==='serve'&&s.server===0&&Date.now()-tossedAt>1500){await phone.locator('#toss').click();tossedAt=Date.now();}
+  if(s?.at!==observedAt){observedAt=s?.at;advancedAt=Date.now();}
+  if(Date.now()-advancedAt>15000)throw Error(`Phone match stopped rendering in ${s?.phase}: ${s?.message}`);
+  if(s?.phase==='serve'&&s.server===0){if(!serveSince)serveSince=Date.now();if(Date.now()-serveSince>20000)throw Error('Virtual player could not produce a tracked-hand serve within 20 seconds');}else serveSince=0;
+  if(s?.score.join(':')!==oldScore){oldScore=s?.score.join(':');console.log(`Phone match ${oldScore}; paddle contacts ${s?.impacts.join(':')}`);}
+  if(s?.phase==='serve'&&s.server===0&&s.tracking?.hand&&Math.abs(s.paddles[0].x-s.ball.x)<.35&&Date.now()-tossedAt>1500){await phone.locator('#toss').click();tossedAt=Date.now();}
   // Derive bounded linear acceleration from the virtual hand trajectory.
   const arm=await game.evaluate(()=>({...window.labArm})),position=[-arm.x*4,-arm.y*2.7],now=Date.now(),dt=Math.max(.04,Math.min(.2,(now-previousAt)/1000));
   const velocity=position.map((p,i)=>(p-previousPosition[i])/dt),acceleration=velocity.map((v,i)=>Math.max(-6,Math.min(6,(v-previousVelocity[i])/dt)));
