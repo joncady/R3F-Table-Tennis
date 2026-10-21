@@ -35,7 +35,8 @@
     "test:lab": "node lab/run.mjs",
     "test:lab:headed": "node lab/run.mjs --headed",
     "lab:report": "playwright show-report lab-report",
-    "lab:runner": "node lab/server.mjs"
+    "lab:runner": "node lab/server.mjs",
+    "prelab": "node controller/prepare-phone.mjs && node controller/prepare-pose.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
