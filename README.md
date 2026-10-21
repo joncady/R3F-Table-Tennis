@@ -66,3 +66,11 @@ aws cloudformation deploy --template-file cloud/template.generated.json --stack-
 ```
 
 See [prototype review](docs/PROTOTYPE_REVIEW.md) for this pass and remaining limits. Earlier experimental instructions are archived in [historical notes](docs/HISTORICAL_PROTOTYPE_NOTES.md).
+
+## v0.2.0 equipment and release identification
+
+Open **Paddle setup** from either mode before starting. Choose a red, blue, green, pink or violet face opposite matte black, and 1.7 / 1.9 / 2.1 mm sponge. Settings persist across modes. The default 1.9 mm preserves the original physics; other presets add modest brush-dependent differences in spin and pace. Equipment is fixed during a match; use **New match to change equipment** if needed. See [equipment research and model limits](docs/EQUIPMENT_NOTES.md).
+
+**Escape or P** pauses mouse play and releases pointer lock. Navigation floats above the pause overlay, and opening setup/developer menus pauses play. Release version and build revision appear on the launcher and game headers, with a link to release notes.
+
+The remaining work is tracked in the [Table Tennis Prototype project](https://github.com/users/joncady/projects/3): physical motion/optical alignment/toss tuning, real Android/iPhone network and feedback trials, sponge/physics validation, multiplayer hardening, dev-tool upgrades and long-recording/legacy cleanup.

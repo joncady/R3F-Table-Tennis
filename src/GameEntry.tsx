@@ -1,4 +1,5 @@
 import { lazy, useState } from 'react';
+import ReleaseBadge from './ReleaseBadge';
 const App = lazy(() => import('./App')),
   WebcamGame = lazy(() => import('./WebcamGame')),
   PoseLab = lazy(() => import('./PoseLab')),
@@ -49,6 +50,7 @@ export default function GameEntry() {
         </button>
       </div>
       <p>F fullscreen · Escape to pause</p>
+      <ReleaseBadge />
     </main>
   );
 }

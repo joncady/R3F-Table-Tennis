@@ -6,6 +6,10 @@ export const winnerFor = (score: number[]): Side | null => Math.max(...score) >=
 export interface PlayerInput { x: number; y: number; moveX?: number; moveZ?: number; bodyX?:number; heldHand?:{x:number;y:number;z:number};requireTrackedHand?:boolean; phone?: boolean; swingOffset?: [number,number,number]; orientation?: [number, number, number, number] }
 // World-space angular velocity (radians/second), shared by play and AI prediction.
 export interface BallState { x: number; y: number; z: number; vx: number; vy: number; vz: number; wx: number; wy: number; wz: number }
+export type SpongeThickness=1.7|1.9|2.1;
+// Modest arcade tuning for one inverted-rubber family, not measured material coefficients.
+export const SPONGE_PRESETS={1.7:{label:'Control',spin:.92,pace:.97},1.9:{label:'Balanced',spin:1,pace:1},2.1:{label:'Attack',spin:1.08,pace:1.03}} as const;
+export function spongeResponse(thickness:SpongeThickness,brushSpeed:number){const preset=SPONGE_PRESETS[thickness]||SPONGE_PRESETS[1.9],engagement=Math.max(0,Math.min(1,brushSpeed/4));return {spin:1+(preset.spin-1)*engagement,pace:1+(preset.pace-1)*engagement};}
 export const SPIN = { brushGain: 9, max: 90, magnus: .0035, drag: .22, maxAcceleration: 3 };
 export function flyBall(b: BallState, dt: number) {
  const clamp = (v: number) => Math.max(-SPIN.maxAcceleration, Math.min(SPIN.maxAcceleration, v));
@@ -48,6 +52,7 @@ export function blendRotation(a: Rotation, b: Rotation, t: number): Rotation {
 }
 export class Match {
  multiplayer = false;
+ sponges:[SpongeThickness,SpongeThickness]=[1.9,1.9];
  far = {handedness:'right' as 'left'|'right', backhand:false, body:{x:0,z:4.05}, brush:{x:0,y:0}, rotation:[0,0,0,1] as Rotation};
  impacts = [0,0];
  handedness: 'left' | 'right' = 'right';
@@ -66,7 +71,7 @@ export class Match {
  // This keeps movement, service, brush spin and collision rules identical at both ends.
  mirror() {
   for (const p of this.paddles) { p.x=-p.x; p.z=-p.z; p.vx=-p.vx; p.vz=-p.vz; }
-  this.paddles.reverse();
+  this.paddles.reverse();this.sponges.reverse();
   const b=this.ball; b.x=-b.x; b.z=-b.z; b.vx=-b.vx; b.vz=-b.vz; b.wx=-b.wx; b.wz=-b.wz;
   [this.body,this.far.body]=[this.far.body,this.body];
   [this.brush,this.far.brush]=[this.far.brush,this.brush];
@@ -125,8 +130,9 @@ export class Match {
   if (side === 0) { this.impactSequence++; this.impactStrength = Math.min(1, Math.hypot(this.brush.x, this.brush.y, Math.max(0, -this.paddles[0].vz)) / 10 + .2); }
   const direction = side === 0 ? -1 : 1;
   const clamp = (n: number) => Math.max(-SPIN.max, Math.min(SPIN.max, n));
-  b.wx = clamp(b.wx * .25 + (side === 0 ? this.brush.y : 0) * direction * SPIN.brushGain);
-  b.wy = clamp(b.wy * .25 + (side === 0 ? this.brush.x : 0) * direction * SPIN.brushGain);
+  const gain=SPIN.brushGain*spongeResponse(this.sponges[side],side===0?Math.hypot(this.brush.x,this.brush.y):0).spin;
+  b.wx = clamp(b.wx * .25 + (side === 0 ? this.brush.y : 0) * direction * gain);
+  b.wy = clamp(b.wy * .25 + (side === 0 ? this.brush.x : 0) * direction * gain);
   b.wz *= .25;
  }
  hit(side: Side) {
@@ -138,7 +144,7 @@ export class Match {
   const targetZ = side === 0 ? -1.65 : 1.65;
   // Use the same brush sample for shot pace and spin.
   const strokeSpeed = side === 0 ? Math.hypot(this.brush.x, this.brush.y, Math.max(0, -p.vz)) : 0;
-  const flight = Math.max(.64, .88 - strokeSpeed * .025);
+  const flight = Math.max(.62, Math.max(.64, .88 - strokeSpeed * .025)/spongeResponse(this.sponges[side],strokeSpeed).pace);
   b.vx = (targetX - b.x) / flight; b.vz = (targetZ - b.z) / flight; b.vy = (1.58 - b.y + 4.9 * flight * flight) / flight;
   this.applyBrush(side);
   this.last = side; this.bounces = 0; this.serving = false; this.net = false;

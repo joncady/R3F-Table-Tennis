@@ -1,3 +1,6 @@
+import EquipmentPanel from './EquipmentPanel';
+import {Equipment,PADDLE_COLORS,useEquipment} from './equipment';
+import ReleaseBadge from './ReleaseBadge';
 import {PaddleAnchor,bladeCenter} from './paddleTracking';
 import {WebcamPanel} from './WebcamPanel';
 import type {WebcamBodyController,BodyControl} from './useWebcamBody';
@@ -5,11 +8,11 @@ import usePhoneController, { PhonePose } from './usePhoneController';
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
 import { useGLTF, PerspectiveCamera } from '@react-three/drei';
-import { Box3, Euler, Group, Mesh, Quaternion, Vector3 } from 'three';
+import { Box3, Euler, Group, Mesh, Quaternion, Vector3, MeshStandardMaterial } from 'three';
 import useDiagnostics from './useDiagnostics';
 import { Match, PlayerInput, followSwing } from './engine';
 
-function Model({ url, size, position }: { url: string; size: [number, number, number]; position: [number, number, number] }) {
+function Model({ url, size, position,equipment }: { equipment?:Equipment; url: string; size: [number, number, number]; position: [number, number, number] }) {
  const { scene } = useGLTF(url);
  const [object] = useState(() => {
   const copy = scene.clone(true);
@@ -21,10 +24,16 @@ function Model({ url, size, position }: { url: string; size: [number, number, nu
   group.scale.set(size[0] / dimensions.x, size[1] / dimensions.y, size[2] / dimensions.z);
   return group;
  });
+ const paddleColor=equipment?.color;
+ useEffect(()=>{
+  if(!paddleColor)return;const materials:{mesh:Mesh;original:MeshStandardMaterial;copy:MeshStandardMaterial}[]=[];
+  object.traverse(child=>{if(!(child instanceof Mesh))return;const original=child.material as MeshStandardMaterial;if(!['Goma_roja','Goma_negra'].includes(original.name))return;const material=original.clone();material.map=null;material.color.set(original.name==='Goma_negra'?'#16191b':PADDLE_COLORS[paddleColor]);material.roughness=1;material.metalness=0;material.needsUpdate=true;child.material=material;materials.push({mesh:child,original,copy:material});});
+  return()=>{materials.forEach(({mesh,original,copy})=>{mesh.material=original;copy.dispose();});};
+ },[object,paddleColor]);
  return <primitive object={object} position={position} />;
 }
 
-export function Court({ match, input, update, cameraStrength, phoneActive, phonePose, phoneSensitivity, lateralFollow, impact, samplePhonePose, beforeStep, timeScale=1, networkFrame, bodyControl,paddlePivot=0,frameCount }: { frameCount?:React.MutableRefObject<number>; paddlePivot?:number;bodyControl?:React.MutableRefObject<BodyControl>; networkFrame?:()=>void; beforeStep?:(dt:number)=>void; timeScale?:number; samplePhonePose?: (now:number)=>PhonePose|null; lateralFollow: number; phoneSensitivity: number; phoneActive: boolean; phonePose: React.MutableRefObject<PhonePose | null>; impact: (strength: number,opponent?:boolean) => void; cameraStrength: number; match: Match; input: React.MutableRefObject<PlayerInput>; update: () => void }) {
+export function Court({ match, input, update, cameraStrength, phoneActive, phonePose, phoneSensitivity, lateralFollow, impact, samplePhonePose, beforeStep, timeScale=1, networkFrame, bodyControl,paddlePivot=0,frameCount,paddleEquipment }: { paddleEquipment?:Equipment; frameCount?:React.MutableRefObject<number>; paddlePivot?:number;bodyControl?:React.MutableRefObject<BodyControl>; networkFrame?:()=>void; beforeStep?:(dt:number)=>void; timeScale?:number; samplePhonePose?: (now:number)=>PhonePose|null; lateralFollow: number; phoneSensitivity: number; phoneActive: boolean; phonePose: React.MutableRefObject<PhonePose | null>; impact: (strength: number,opponent?:boolean) => void; cameraStrength: number; match: Match; input: React.MutableRefObject<PlayerInput>; update: () => void }) {
  const ball = useRef<Mesh>(null);
  const human = useRef<Group>(null);
  const ai = useRef<Group>(null);
@@ -39,6 +48,7 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
  const sway = useRef({ yaw: 0, pitch: 0, x: 0, y: 0 });
  useFrame((state, delta) => {
   if(frameCount)frameCount.current++;
+  if(paddleEquipment)match.sponges[0]=paddleEquipment.sponge;
   const pose = samplePhonePose ? samplePhonePose(performance.now()) : phonePose.current;
   if (phoneActive && pose && performance.now() - pose.received < 1000) {
    input.current.swingOffset = pose.swing ? pose.swing.map((value, axis) => value * phoneSensitivity * (axis === 0 ? lateralFollow : 1)) as [number,number,number] : undefined;
@@ -102,14 +112,15 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
   <Model url="./models/table_tennis_table.glb" size={[3.05, 1.85, 5.48]} position={[0, .855, 0]} />
   <mesh position={[0, 1.73, 0]}><boxGeometry args={[3.35, .3, .035]} /><meshStandardMaterial color="#c2d9dc" wireframe /></mesh>
   <mesh ref={ball} visible={!bodyControl}><sphereGeometry args={[.08, 20, 20]} /><meshStandardMaterial color="#fff6d5" emissive="#8b6928" emissiveIntensity={.25} /><mesh><sphereGeometry args={[.081, 16, 8, 0, .18]} /><meshBasicMaterial color="#dc6b36" side={2} /></mesh></mesh>
-  <group ref={human}><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
+  <group ref={human}><Model equipment={paddleEquipment} url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
   <group ref={ai}><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.05, 0]}><planeGeometry args={[200, 200]} /><meshStandardMaterial color="#102a34" /></mesh>
  </>;
 }
 
 export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyController;mouseOnly?:boolean}={}) {
- const [dev,setDev]=useState(false);
+ const [dev,setDev]=useState(false),[equipmentOpen,setEquipmentOpen]=useState(false);
+ const [equipment,setEquipment]=useEquipment();
  const frameCount=useRef(0),lastRenderCount=useRef(0);
  useEffect(()=>{lastRenderCount.current=frameCount.current;},[dev]);
  const diagnostics=useDiagnostics(dev,()=>{const renderFps=frameCount.current-lastRenderCount.current;lastRenderCount.current=frameCount.current;return {renderFps,mode:'mouse + keyboard'};});
@@ -192,6 +203,7 @@ export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyControll
   return()=>clearTimeout(timer);
  },[webcam?.quickMode,match.phase,hand]);
  const startGame = () => {
+  setDev(false);setEquipmentOpen(false);
   if(quickTest.current){startTossTest();return;}
   if(!canPlay())return;
   if(phone.connected){resumePhone();return;}
@@ -237,6 +249,8 @@ export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyControll
    controls.moveZ = Number(held.has('KeyS')) - Number(held.has('KeyW'));
   };
   const key = (event: KeyboardEvent) => {
+   const typing=event.target instanceof HTMLElement&&['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName);
+   if(!typing&&['Escape','KeyP'].includes(event.code)&&!event.repeat){setPaused(true);if(document.pointerLockElement)document.exitPointerLock();return;}
    if(event.target instanceof HTMLElement && ['INPUT','SELECT','TEXTAREA','BUTTON'].includes(event.target.tagName))return;
    if (['KeyA', 'KeyD', 'KeyW', 'KeyS'].includes(event.code)) {
     event.preventDefault(); if (!paused) held.add(event.code); movement();
@@ -245,7 +259,6 @@ export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyControll
     event.preventDefault();
     if (!event.repeat && !paused) { if (match.phase === 'ready') { match.start(); setPaused(true); captureMouse(); } else match.serve(); update(); }
    }
-   if (event.code === 'Escape' && !event.repeat) { setPaused(true); if (document.pointerLockElement) document.exitPointerLock(); }
   };
   const keyup = (event: KeyboardEvent) => { held.delete(event.code); movement(); };
   const blur = () => { held.clear(); movement(); setPaused(true); };
@@ -266,10 +279,11 @@ export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyControll
   {webcam&&<WebcamPanel webcam={webcam} pause={pauseGame} startTest={startTossTest}/>}
   {showPairing && <div className="overlay pairing"><article><small>PHONE CONTROLLER</small><h1>{phone.connected ? 'Your phone is connected.' : 'Pair your paddle.'}</h1><p>{phone.status}</p>{mouseError&&<p role="alert">{mouseError}</p>}<button onClick={phone.pair}>{phone.pairing ? 'Create new pairing' : 'Create pairing'}</button>{phone.pairing && <><img width="180" height="180" src={phone.pairing.qr} alt="Phone controller pairing QR code" />{phone.pairing.certificateUrl?<p>Local Wi-Fi pairing. Android users can install the local CA from <a href={phone.pairing.certificateUrl}>{phone.pairing.certificateUrl}</a> under Settings → Security → Install certificate → CA certificate. This trusts only this prototype’s locally generated CA; remove it when finished. For iPhone, use the public HTTPS game for the simplest setup; local certificates require installation and explicit full trust in iOS Settings.</p>:<p>Scan the QR on iPhone or Android, tap Connect, and calibrate. iPhone will ask for Motion & Orientation permission. No local certificate or shared Wi-Fi is needed. The phone shows round-trip latency through this game.</p>}<p>Then scan the QR or open <a href={phone.pairing.phoneUrl}>{phone.pairing.phoneUrl}</a>, tap Connect, and calibrate.</p></>}<button disabled={!phone.connected} onClick={() => { input.current.x=0; input.current.y=0; resumePhone(); }}>{match.phase === 'ready' ? 'Start with phone' : 'Continue with phone'}</button><button onClick={() => { setPhoneActive(false); setShowPairing(false); }}>Use mouse</button></article></div>}
 
-  <header><div className="brand">TABLE / TENNIS<small>{webcam?'Webcam body · local singles':'First-person singles'}</small></div><div className="score"><span className={match.server === 0 ? 'server' : ''}>YOU <b>{match.score[0]}</b></span><i>:</i><span className={match.server === 1 ? 'server' : ''}><b>{match.score[1]}</b> AI</span></div><div className="view-controls"><button onClick={()=>{location.href=import.meta.env.BASE_URL;}}>Modes</button><button onClick={()=>setDev(v=>!v)}>Developer tools</button>{!mouseOnly&&<button onClick={() => { pauseGame(); setShowPairing(true); }}>{phone.connected ? 'Edit phone pairing' : phone.pairing ? 'Reconnect phone' : 'Pair phone'}</button>}<button onClick={() => { if (paused || match.phase==='ready') startGame(); else pauseGame(); }}>{match.phase==='ready'?'Start game':paused ? 'Resume' : 'Pause'}</button></div></header>
+  <header className="game-navigation"><div className="brand">TABLE / TENNIS<ReleaseBadge/><small>{webcam?'Webcam body · local singles':'First-person singles'}</small></div><div className="score"><span className={match.server === 0 ? 'server' : ''}>YOU <b>{match.score[0]}</b></span><i>:</i><span className={match.server === 1 ? 'server' : ''}><b>{match.score[1]}</b> AI</span></div><div className="view-controls"><button onClick={()=>{location.href=import.meta.env.BASE_URL;}}>Modes</button><button onClick={()=>{pauseGame();setEquipmentOpen(v=>!v);setDev(false);}}>Paddle setup</button><button onClick={()=>{pauseGame();setDev(v=>!v);setEquipmentOpen(false);}}>Developer tools</button>{!mouseOnly&&<button onClick={() => { pauseGame(); setShowPairing(true); }}>{phone.connected ? 'Edit phone pairing' : phone.pairing ? 'Reconnect phone' : 'Pair phone'}</button>}<button onClick={() => { if (paused || match.phase==='ready') startGame(); else pauseGame(); }}>{match.phase==='ready'?'Start game':paused ? 'Resume' : 'Pause'}</button></div></header>
+  {equipmentOpen&&<EquipmentPanel equipment={equipment} change={setEquipment} restart={()=>{const next=new Match(hand);activeMatch.current=next;setMatch(next);setPaused(true);}} close={()=>setEquipmentOpen(false)} locked={match.phase!=='ready'&&match.phase!=='over'}/>}
   {dev&&<aside className="mouse-dev"><h2>Developer tools</h2>{Object.entries(diagnostics).map(([key,value])=><p key={key}>{key}: {value}</p>)}<a href="?multiplayer">Multiplayer prototype</a></aside>}
-  <Canvas frameloop={paused ? 'never' : 'always'}><color attach="background" args={['#102a34']} /><Suspense fallback={null}><Court frameCount={frameCount} bodyControl={useBody||webcam?.quickMode?webcam?.control:undefined} match={match} input={input} update={update} cameraStrength={cameraStrength} phoneActive={phoneActive} phonePose={phone.pose} samplePhonePose={phone.samplePose} phoneSensitivity={phoneSensitivity} lateralFollow={lateralFollow} impact={phone.impact} /></Suspense></Canvas>
-  <section className="status"><span>{webcam?.quickMode?'TOSS PRACTICE · RESETS AUTOMATICALLY':match.score[0] >= 10 && match.score[1] >= 10 ? 'DEUCE · WIN BY TWO' : 'FIRST TO 11 · WIN BY TWO'}</span><h2>{webcam?.quickMode&&match.phase==='ready'?'Ready to test hand release':phoneActive ? match.message.replace('Space to toss', 'Tap Toss on your phone') : match.message}</h2>{fullscreenError && <p role="status">{fullscreenError}</p>}{mouseError && <p role="status">{mouseError}</p>}<p>{webcam ? `Webcam body · ${webcam.quickMode?'Quick toss test · no calibration':!useBody?'Movement disabled':webcam.safe?'Tracking':'Paused / needs calibration'} · ${phoneActive?'Phone paddle':'Mouse paddle'} · Space / phone Toss` : phoneActive ? `Phone paddle · ${phone.connected ? 'Connected' : 'Disconnected'} · Swing your phone · Toss and pause on your phone` : `A/D to move · W/S to step · Move mouse to swing · Space to toss · ${mouseLocked ? 'Mouse captured' : 'Mouse free'}`} · F fullscreen · Esc to pause · {match.backhand ? 'Backhand' : 'Forehand'}</p></section>
+  <Canvas frameloop={paused ? 'never' : 'always'}><color attach="background" args={['#102a34']} /><Suspense fallback={null}><Court paddleEquipment={equipment} frameCount={frameCount} bodyControl={useBody||webcam?.quickMode?webcam?.control:undefined} match={match} input={input} update={update} cameraStrength={cameraStrength} phoneActive={phoneActive} phonePose={phone.pose} samplePhonePose={phone.samplePose} phoneSensitivity={phoneSensitivity} lateralFollow={lateralFollow} impact={phone.impact} /></Suspense></Canvas>
+  <section className="status"><span>{webcam?.quickMode?'TOSS PRACTICE · RESETS AUTOMATICALLY':match.score[0] >= 10 && match.score[1] >= 10 ? 'DEUCE · WIN BY TWO' : 'FIRST TO 11 · WIN BY TWO'}</span><h2>{webcam?.quickMode&&match.phase==='ready'?'Ready to test hand release':phoneActive ? match.message.replace('Space to toss', 'Tap Toss on your phone') : match.message}</h2>{fullscreenError && <p role="status">{fullscreenError}</p>}{mouseError && <p role="status">{mouseError}</p>}<p>{webcam ? `Webcam body · ${webcam.quickMode?'Quick toss test · no calibration':!useBody?'Movement disabled':webcam.safe?'Tracking':'Paused / needs calibration'} · ${phoneActive?'Phone paddle':'Mouse paddle'} · Space / phone Toss` : phoneActive ? `Phone paddle · ${phone.connected ? 'Connected' : 'Disconnected'} · Swing your phone · Toss and pause on your phone` : `A/D to move · W/S to step · Move mouse to swing · Space to toss · ${mouseLocked ? 'Mouse captured' : 'Mouse free'}`} · F fullscreen · Esc / P to pause · {match.backhand ? 'Backhand' : 'Forehand'}</p></section>
   {!showPairing && (match.phase === 'ready' || match.phase === 'over' || paused) && <div className="overlay"><article><small>TABLE / TENNIS</small><h1>{match.phase==='ready' ? 'Ready to play.' : match.phase === 'over' ? match.winner === 0 ? 'You win!' : 'AI wins.' : paused ? 'Game paused.' : 'Find your rhythm.'}</h1><p>{match.phase === 'over' ? `${match.score[0]} – ${match.score[1]}` : webcam?.quickMode ? 'Quick toss test: enable webcam, then start. No side steps, phone calibration, or phone pairing required. Show your shoulders and free hand, lift your free hand naturally to toss. No precise palm pose or waiting required.' : webcam ? 'Calibrate the camera using the floor markers. Step left or right to move your body. Use your phone or mouse to swing the paddle; toss to serve. Resume after calibration.' : phoneActive ? 'Swing your phone to move the paddle. Use Toss / start on your phone to serve, and Pause / resume to take a break or return to play. Keep the controller open on your phone.' : 'Move your body with A/D and take short steps with W/S. Sweep the mouse to swing your paddle. Space tosses the ball; swing as it drops to serve. Cross your body for a backhand. Brush up for topspin, down for backspin, or sideways for sidespin. Contact returns automatically. Starting captures and hides the mouse; Escape releases it.'}</p>{mouseError && <><p role="status">{mouseError}</p>{mouseError.startsWith('Mouse capture')&&<button onClick={() => { if(canPlay()){setMouseError('');setFreeMouse(true); setPaused(false);} }}>Continue with limited mouse</button>}</>}{!mouseOnly&&<><button onClick={() => { location.href='?multiplayer'; }}>Play multiplayer</button><button onClick={() => { pauseGame(); setShowPairing(true); }}>{phone.connected ? 'Edit phone pairing' : phone.pairing ? 'Reconnect phone' : 'Pair iPhone / Android'}</button></>}{dev&&!webcam?.quickMode&&<><label className="camera-setting">Lateral follow <input aria-label="Lateral follow" type="range" min="1" max="10" step="0.5" value={lateralFollow} onChange={event => setLateralFollow(Number(event.target.value))} />{lateralFollow.toFixed(1)}×</label><label className="camera-setting">Phone reach <input aria-label="Phone reach sensitivity" type="range" min="0.5" max="3" step="0.1" value={phoneSensitivity} onChange={event => setPhoneSensitivity(Number(event.target.value))} />{phoneSensitivity.toFixed(1)}×</label><label className="camera-setting">Camera follow <input aria-label="Camera follow" type="range" min="0" max="1" step="0.05" value={cameraStrength} onChange={event => setCameraStrength(Number(event.target.value))} />{cameraStrength === 0 ? 'Off' : 'Subtle'}</label>{webcam&&<div><p role="status">{useBody ? webcam.safe?'Body tracking ready.':'Webcam movement requires calibration and visible hips/shoulders.' : 'Webcam movement off. Paddle controls remain available.'}</p><button onClick={()=>{bodyRequired.current=!useBody;setUseBody(!useBody);if(useBody)startGame();else pauseGame();}}>{useBody?'Play without webcam movement':'Enable webcam movement'}</button></div>}</>}<div className="hand-choice" role="group" aria-label="Playing hand">{(['left', 'right'] as const).map(choice => <button key={choice} aria-pressed={hand === choice} disabled={match.phase === 'toss' || match.phase === 'rally'} onClick={() => { setHand(choice); match.setHand(choice); input.current.x = 0; input.current.y = 0; update(); }}>{choice === 'left' ? 'Left handed' : 'Right handed'}</button>)}</div><button onClick={startGame}>{webcam?.quickMode?'Start toss test':match.phase === 'over' ? 'Play again' : match.phase==='ready' ? 'Start game' : paused ? 'Resume game' : 'Start game'}</button></article></div>}
  </main>;
 }

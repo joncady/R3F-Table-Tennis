@@ -1,3 +1,6 @@
+import EquipmentPanel from './EquipmentPanel';
+import { useEquipment } from './equipment';
+import ReleaseBadge from './ReleaseBadge';
 import { Suspense, useEffect, useRef, useState } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { Court } from './App';
@@ -17,6 +20,8 @@ function newGame(hand: 'left' | 'right') {
 }
 export default function WebcamGame() {
   const webcam = useWebcamBody();
+  const [equipment, setEquipment] = useEquipment(),
+    [equipmentOpen, setEquipmentOpen] = useState(false);
   const [recording, setRecording] = useState(false),
     [recordBusy, setRecordBusy] = useState(false),
     [recordSeconds, setRecordSeconds] = useState(0),
@@ -136,6 +141,8 @@ export default function WebcamGame() {
   function play() {
     if (!ready()) return;
     autoPending.current = false;
+    setEquipmentOpen(false);
+    setAdvanced(false);
     setNotice('');
     if (match.phase === 'over') {
       const next = newGame(hand);
@@ -393,7 +400,9 @@ export default function WebcamGame() {
     <main ref={host} className="play-game">
       <header>
         <div className="brand">
-          TABLE / TENNIS<small>Phone paddle · webcam movement</small>
+          TABLE / TENNIS
+          <ReleaseBadge />
+          <small>Phone paddle · webcam movement</small>
         </div>
         <div className="score">
           <span>
@@ -415,10 +424,23 @@ export default function WebcamGame() {
           </button>
           <button
             onClick={() => {
+              autoPending.current = false;
+              setPaused(true);
+              setEquipmentOpen(false);
               setAdvanced((v) => !v);
             }}
           >
             Developer tools
+          </button>
+          <button
+            onClick={() => {
+              autoPending.current = false;
+              setPaused(true);
+              setAdvanced(false);
+              setEquipmentOpen((v) => !v);
+            }}
+          >
+            Paddle setup
           </button>
           <button
             onClick={() => {
@@ -436,6 +458,7 @@ export default function WebcamGame() {
         <color attach="background" args={['#102a34']} />
         <Suspense fallback={null}>
           <Court
+            paddleEquipment={equipment}
             frameCount={frameCount}
             paddlePivot={paddlePivot}
             bodyControl={webcam.control}
@@ -591,6 +614,7 @@ export default function WebcamGame() {
           {notice && <p>{notice}</p>}
         </section>
       )}
+
       {advanced && (recordStatus || recordFiles) && (
         <aside className="playtest-recording" role="status">
           <span>{recordStatus}</span>
@@ -634,6 +658,19 @@ export default function WebcamGame() {
           <button onClick={() => setTrialStatus('')}>Dismiss</button>
         )}
       </section>
+      {equipmentOpen && (
+        <EquipmentPanel
+          equipment={equipment}
+          change={setEquipment}
+          restart={() => {
+            autoPending.current = false;
+            setMatch(newGame(hand));
+            setPaused(true);
+          }}
+          close={() => setEquipmentOpen(false)}
+          locked={match.phase !== 'ready' && match.phase !== 'over'}
+        />
+      )}
       {advanced && (
         <aside className="play-advanced">
           <button onClick={() => setAdvanced(false)}>
