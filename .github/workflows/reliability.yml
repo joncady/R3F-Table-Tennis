@@ -1,0 +1,40 @@
+name: Virtual lab reliability
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      extended:
+        description: Record a complete real-time browser match
+        type: boolean
+        default: false
+  schedule:
+    - cron: '37 10 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: virtual-lab-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    env:
+      LAB_EXTENDED: ${{ (github.event_name == 'schedule' || inputs.extended) && '1' || '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium ffmpeg
+      - run: npm test && npm run test:webcam
+      - run: npm run test:lab
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: virtual-lab-${{ github.run_id }}
+          path: |
+            lab-results/
+            lab-report/
+          retention-days: 14

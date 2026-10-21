@@ -1,0 +1,36 @@
+{
+  "date": "2026-10-21",
+  "environment": "Local macOS, Node 24.19, Playwright Chromium; actual CPU MediaPipe inference",
+  "fixtureSha256": "9825ceab1b2ce3691e3678215314959830e86cb40d1b22bd46826091788f37fa",
+  "provenance": "Oracle observer via detached snapshots; normal DOM mouse/keyboard inputs or generated pixel animation + phone sensor events through shipped controller and relay; no ball/score/speed/AI overrides",
+  "matches": {
+    "complete-match": {
+      "score": [
+        1,
+        11
+      ],
+      "paddleContacts": [
+        42,
+        46
+      ],
+      "samples": 410
+    },
+    "complete-phone-match": {
+      "score": [
+        1,
+        11
+      ],
+      "paddleContacts": [
+        9,
+        14
+      ],
+      "samples": 263
+    }
+  },
+  "phoneWebcamStartupMs": 4247,
+  "observedCommandFeedbackMs": {
+    "wifi": 35,
+    "congested": 403
+  },
+  "limits": "Single local baseline, not an FPS guarantee or physical accuracy validation. Generated pixel deformation is not biomechanically realistic. Virtual player lost both matches."
+}

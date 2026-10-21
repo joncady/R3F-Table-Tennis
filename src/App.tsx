@@ -1,3 +1,4 @@
+import { observeLab } from './virtualLab';
 import Net from './Net';
 import Ball from './Ball';
 import FullscreenButton from './FullscreenButton';
@@ -86,6 +87,7 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
    if (!phoneActive && !steadyInput) { input.current.x *= Math.exp(-.8 / 120); input.current.y *= Math.exp(-2.4 / 120); }
    accumulator.current -= 1 / 120;
   }
+  observeLab(match, input.current, phoneActive, bodyControl?.current);
   const moving = match.phase === 'serve' || match.phase === 'toss' || match.phase === 'rally';
   followSwing(sway.current, moving ? match.brush.x : 0, moving ? match.brush.y : 0, delta, cameraStrength);
   if (lastImpact.current.match !== match) lastImpact.current = {match,sequence:match.impactSequence};

@@ -98,3 +98,41 @@ The original model links, authors and license identifiers are preserved in each 
 Game adaptations: models are centered, scaled and positioned at runtime; the paddle filename was renamed, and the player’s rubber materials can be recolored with matte presets. Credit for the original models belongs to the creators listed above.
 
 Found a bug? [Open a repository issue](https://github.com/joncady/R3F-Table-Tennis/issues/new), including the displayed version/build, browser/device and steps to reproduce.
+
+## Virtual test lab
+
+Use Node 24 (`nvm use`; Node 22.13+ is supported). The lab runs locally, uses no AWS resources, and does not include personal camera recordings.
+
+```sh
+npm ci
+npx playwright install chromium ffmpeg
+npm run lab:runner
+# Open http://127.0.0.1:5191
+```
+
+The runner offers smoke, vision, phone, webcam, mouse and complete-match trials. It starts isolated Vite/relay servers on ports 5190/8789/8790 as needed, shows live logs, and links to the latest report with playable browser videos, measurements and failure traces. Only one run can run at once (GUI and CLI share an atomic run lock). Stop cancels it. After a forced process crash, a stale `.lab-run.lock` may need removing once you confirm no lab process is running. The service binds to loopback and requires its own page's origin/token for mutations. Do not run two CLI suites simultaneously: they share the latest report directory.
+
+```sh
+npm run test:lab                 # browser reliability gate
+LAB_EXTENDED=1 npm run test:lab   # full real-time AI matches too
+npm run lab:report               # open recorded results
+npm run lab                     # interactive real-model camera console on :5190
+```
+
+| Trial | Real application path | Simulated input |
+| --- | --- | --- |
+| Vision | Actual pose WASM and nested hand worker; translation, occlusion, reacquisition | Fictional generated camera image, translated/covered pixels |
+| Phone + webcam | Actual camera/hand/QR workers, session-bound alignment, auto setup, body movement, Toss and remote pause/resume | Canvas camera stream, phone orientation/motion events; permission consent supplied by harness |
+| Phone network | Shipped controller page + actual relay, commands, quaternion/acceleration samples, audio/vibration API calls, reconnect | Seeded ordered WebSocket latency/jitter/stall/disconnect; DevTools HTTP throttling/offline |
+| Mouse game | Real renderer, physics, AI, serve/scoring and pause/resume | Bounded relative mouse events and Space; supported limited-mouse fallback if headless Chrome denies capture |
+| Animated phone game | Actual visual paddle tracking and phone/relay path | Pixel-space arm deformation plus emulated phone sensors and normal Toss button |
+
+The virtual players read copied game observations to aim (an **oracle observer**, not screenshot-only perception). They cannot access live Match/input references or change ball, points, AI difficulty, or simulation speed. `?virtual-player` observations and `?vision-cpu` backend selection are available only in localhost development builds. CI selects the actual CPU vision delegate for consistent hardware availability. The generated arm animation is a synthetic visual stress fixture, not a biomechanically accurate human recording. Complete matches run at ordinary game speed; either side may win, but the score must obey first-to-11/win-by-two rules.
+
+The network proxy preserves WebSocket text frames and ordering, caps pending messages, and records measured command-to-feedback latency. Its stalls model application transport delays; they are not TCP packet-loss simulation. Browser [DevTools network emulation](https://chromedevtools.github.io/devtools-protocol/tot/Network/#method-emulateNetworkConditions) additionally tests HTTP loading/offline behavior. Do not assume HTTP throttling alone delays an already-open WebSocket. Audio/vibration assertions prove the API calls happened; a real phone is still needed to assess audible/tactile quality.
+
+Pages deployment now requires the browser smoke suite. Pull requests run the same suite; scheduled/manual extended runs record full matches. GitHub Actions retains reports, videos and failure traces for 14 days. Timing measurements are diagnostics rather than universal hardware/network performance guarantees. These trials supplement physical playtests and do not by themselves close motion-accuracy, grip, toss, or real-device issues.
+
+Fixture provenance: `lab/fixtures/player.png` was generated for this repository using the image-generation tool on 2026-10-21. It depicts a fictional adult left-handed player in a plain room, phone in the paddle hand and open opposite palm. No user photos or recordings are used. Model downloads remain checksummed by `controller/prepare-pose.mjs`.
+
+First measured local baseline (2026-10-21): both full real-time browser matches completed legally at 1–11. The mouse player made 42 contacts (AI 46); the generated-webcam/phone player made 9 (AI 14). Webcam/phone startup took 4.25 seconds in the smoke trial. Command-to-feedback round trips were 35 ms on the unimpeded proxy and 403 ms with the congested profile. A 1.8-second transport stall paused the actual game; reconnect required alignment again. See `lab/baseline.json` for provenance. These are observed examples, not thresholds tuned to make tests pass or claims about physical phone accuracy.

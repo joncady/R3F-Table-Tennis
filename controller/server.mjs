@@ -8,6 +8,7 @@ import {randomBytes} from 'node:crypto';
 import {execFileSync} from 'node:child_process';
 import {WebSocketServer, WebSocket} from 'ws';
 const root=path.dirname(fileURLToPath(import.meta.url));
+const httpPort=Number(process.env.CONTROLLER_HTTP_PORT||8787),httpsPort=Number(process.env.CONTROLLER_HTTPS_PORT||8788);
 const certs=path.join(root,'.certs');fs.mkdirSync(certs,{recursive:true});
 const ips=Object.values(os.networkInterfaces()).flat().filter(i=>i&&i.family==='IPv4'&&!i.internal).map(i=>i.address);
 const ip=process.env.CONTROLLER_IP||ips[0]||'127.0.0.1';
@@ -29,7 +30,7 @@ function handle(req,res){
  if(url.pathname==='/session'&&req.method==='POST'){
   if(!allowed(req)){res.writeHead(403);res.end();return;}
   const room=randomBytes(12).toString('hex'),host=randomBytes(18).toString('hex');sessions.set(room,{host,clients:new Set(),created:Date.now()});
-  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({room,host,phoneUrl:`https://${ip}:8788/controller.html#${room}`,certificateUrl:`http://${ip}:8787/ca.crt`}));return;
+  res.setHeader('Content-Type','application/json');res.end(JSON.stringify({room,host,phoneUrl:`https://${ip}:${httpsPort}/controller.html#${room}`,certificateUrl:`http://${ip}:${httpPort}/ca.crt`}));return;
  }
  if(url.pathname==='/trial'&&req.method==='POST'){
   if(!allowed(req)||!sessions.has(url.searchParams.get('room'))){res.writeHead(403);res.end();return;}
@@ -80,5 +81,5 @@ function sockets(server){const wss=new WebSocketServer({server,maxPayload:2048})
  });return wss;}
 const servers=[sockets(plain),sockets(secure)];
 const heartbeat=setInterval(()=>{for(const wss of servers)for(const c of wss.clients){if(!c.alive)c.terminate();else{c.alive=false;c.ping();}}for(const [id,s]of sessions)if(Date.now()-s.created>86400000){for(const c of s.clients)c.close();sessions.delete(id);}},15000);
-plain.listen(8787,'0.0.0.0');secure.listen(8788,'0.0.0.0',()=>console.log(`Controller relay ready. Phone HTTPS: https://${ip}:8788/controller.html\nAndroid CA download: http://${ip}:8787/ca.crt\nDesktop relay: http://127.0.0.1:8787`));
+plain.listen(httpPort,'0.0.0.0');secure.listen(httpsPort,'0.0.0.0',()=>console.log(`Controller relay ready. Phone HTTPS: https://${ip}:${httpsPort}/controller.html\nAndroid CA download: http://${ip}:${httpPort}/ca.crt\nDesktop relay: http://127.0.0.1:${httpPort}`));
 function stop(){clearInterval(heartbeat);for(const wss of servers)for(const c of wss.clients)c.terminate();plain.close();secure.close();}process.on('SIGINT',stop);process.on('SIGTERM',stop);

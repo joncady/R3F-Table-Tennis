@@ -1,0 +1,40 @@
+import {test,expect} from '@playwright/test';
+import {WebSocket} from 'ws';
+import {impairedRelay} from '../network.mjs';
+const wait=(socket,predicate,timeout=15000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{socket.off('message',read);reject(Error('Relay message timed out'));},timeout);function read(raw){const m=JSON.parse(raw);if(predicate(m)){clearTimeout(timer);socket.off('message',read);resolve(m);}}socket.on('message',read);});
+for(const profile of [{name:'wifi',latency:0,jitter:0},{name:'congested mobile',latency:120,jitter:90}])test(`shipped phone controls and sensor events over ${profile.name}`,async({page,request,context},info)=>{
+ await context.addInitScript(()=>{for(const api of [window.DeviceOrientationEvent,window.DeviceMotionEvent])if(api)api.requestPermission=async()=>"granted";
+ window.labFeedback={vibrations:0,oscillators:0};const vibrate=navigator.vibrate?.bind(navigator);navigator.vibrate=(pattern)=>{window.labFeedback.vibrations++;return vibrate?.(pattern)??false;};const create=AudioContext.prototype.createOscillator;AudioContext.prototype.createOscillator=function(){window.labFeedback.oscillators++;return create.call(this);};});
+ const session=await(await request.post('http://127.0.0.1:8789/session',{headers:{Origin:'http://127.0.0.1'}})).json();
+ const proxy=await impairedRelay(profile),host=new WebSocket(`ws://127.0.0.1:8789/?room=${session.room}&role=host&host=${session.host}`,{origin:'http://127.0.0.1'});
+ await new Promise(resolve=>host.once('open',resolve));
+ const messages=[];host.on('message',raw=>messages.push({...JSON.parse(raw),received:Date.now()}));
+ try{
+  const cdp=await context.newCDPSession(page);await cdp.send('Network.enable');await cdp.send('Network.setCacheDisabled',{cacheDisabled:true});
+  if(profile.latency)await cdp.send('Network.emulateNetworkConditions',{offline:false,latency:profile.latency,downloadThroughput:250000,uploadThroughput:125000,connectionType:'cellular3g'});
+  await page.goto(`http://127.0.0.1:8789/controller.html#room=${session.room}&relay=${encodeURIComponent(proxy.url)}`);
+  await page.getByRole('button',{name:'Connect phone',exact:true}).click();
+  await expect(page.locator('#start')).toBeEnabled();
+  const start=wait(host,m=>m.type==='start');await page.locator('#start').click();await start;
+  const pause=wait(host,m=>m.type==='pause');await page.locator('#pause').click();await pause;
+  const toss=wait(host,m=>m.type==='toss');await page.locator('#toss').click();await toss;
+  await page.evaluate(()=>{window.sensorTimer=setInterval(()=>{const t=performance.now()/1000;const e=new Event('deviceorientation');Object.assign(e,{alpha:15*Math.sin(t*2),beta:90+10*Math.sin(t*3),gamma:0});dispatchEvent(e);const motion=new Event('devicemotion');Object.assign(motion,{acceleration:{x:2*Math.sin(t*4),y:0,z:0},accelerationIncludingGravity:{x:0,y:9.81,z:0},rotationRate:{alpha:0,beta:0,gamma:0},interval:16});dispatchEvent(motion);},20);});
+  await expect.poll(()=>messages.filter(m=>m.type==='motion').length).toBeGreaterThan(15);
+  const motion=messages.filter(m=>m.type==='motion');expect(motion.every(m=>m.q?.length===4&&m.q.every(Number.isFinite))).toBeTruthy();
+  expect(new Set(motion.map(m=>m.q.join(','))).size).toBeGreaterThan(5);
+  const began=Date.now(),signal=wait(host,m=>m.type==='start');await page.locator('#start').click();await signal;
+  host.send(JSON.stringify({type:'impact',strength:.7}));await expect(page.locator('#impactCount')).toContainText('1');const rtt=Date.now()-began;
+  expect(rtt).toBeGreaterThanOrEqual(profile.latency*2-15);
+  await expect.poll(()=>page.evaluate(()=>window.labFeedback.vibrations)).toBeGreaterThan(0);
+  const feedback=await page.evaluate(()=>window.labFeedback);expect(feedback.oscillators).toBeGreaterThan(0);
+  host.send(JSON.stringify({type:'opponent-hit',strength:.5}));await expect.poll(()=>page.evaluate(()=>window.labFeedback.oscillators)).toBeGreaterThan(feedback.oscillators);
+  proxy.stall(1000);const before=messages.filter(m=>m.type==='motion').length;await page.waitForTimeout(450);expect(messages.filter(m=>m.type==='motion').length-before).toBeLessThan(12);
+  await page.waitForTimeout(1000);expect(proxy.stats().maxQueued).toBeLessThanOrEqual(256);
+  proxy.disconnect();await expect(page.locator('#start')).toBeDisabled();
+  await page.locator('#connect').click();await expect(page.locator('#start')).toBeEnabled();const resumed=wait(host,m=>m.type==='start');await page.locator('#start').click();await resumed;
+  await cdp.send('Network.emulateNetworkConditions',{offline:true,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+  await expect(page.evaluate(()=>fetch('/controller.html?offline-trial='+Date.now()))).rejects.toThrow();
+  await cdp.send('Network.emulateNetworkConditions',{offline:false,latency:0,downloadThroughput:-1,uploadThroughput:-1});
+  await info.attach('phone-network',{body:JSON.stringify({profile,rtt,packets:motion.length,queue:proxy.stats(),feedback:await page.evaluate(()=>window.labFeedback),provenance:'Actual controller.html, DeviceOrientation/DeviceMotion events, real relay, ordered WS fault proxy. Browser emulated sensors, not physical inertial accuracy.'},null,2),contentType:'application/json'});
+ }finally{host.terminate();await proxy.close();}
+});

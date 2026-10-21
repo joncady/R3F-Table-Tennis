@@ -45,3 +45,8 @@ multiplayer/template.generated.json
 public/pose-runtime/
 
 public/marker.mjs
+
+# Virtual test lab artifacts
+lab-results/
+lab-report/
+.lab-run.lock
