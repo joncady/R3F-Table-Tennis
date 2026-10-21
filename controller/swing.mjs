@@ -72,3 +72,14 @@ export function gripFrame(upVector,rightVector){
  const length=Math.hypot(...q);return q.map(v=>v/length);
 }
 export function mappedRotation(relative,basis){return multiplyRotation(multiplyRotation(basis,relative),[-basis[0],-basis[1],-basis[2],basis[3]]);}
+
+// Device axes are tied to the physical screen. Preserve pitch/roll and only
+// choose a heading toward the table, rather than flattening the initial grip.
+export function screenFaceFrame(current){
+ const s=Math.SQRT1_2,raw=multiplyRotation([-s,0,0,s],current);
+ const face=rotateVector([0,0,1],raw),top=rotateVector([0,1,0],raw);
+ const direction=Math.hypot(face[0],face[2])>.12?face:top;
+ const yaw=Math.PI-Math.atan2(direction[0],direction[2]);
+ return multiplyRotation([0,Math.sin(yaw/2),0,Math.cos(yaw/2)],raw);
+}
+export function screenFaceRotation(relative,frame){return multiplyRotation(frame,relative);}

@@ -3,7 +3,7 @@ export type Phase = 'ready' | 'serve' | 'toss' | 'rally' | 'point' | 'over';
 export const other = (side: Side): Side => side === 0 ? 1 : 0;
 export const serverFor = (score: number[]): Side => (Math.floor((score[0] + score[1]) < 20 ? (score[0] + score[1]) / 2 : score[0] + score[1]) % 2) as Side;
 export const winnerFor = (score: number[]): Side | null => Math.max(...score) >= 11 && Math.abs(score[0] - score[1]) >= 2 ? (score[0] > score[1] ? 0 : 1) : null;
-export interface PlayerInput { x: number; y: number; moveX?: number; moveZ?: number; phone?: boolean; swingOffset?: [number,number,number]; orientation?: [number, number, number, number] }
+export interface PlayerInput { x: number; y: number; moveX?: number; moveZ?: number; bodyX?:number; heldHand?:{x:number;y:number;z:number};requireTrackedHand?:boolean; phone?: boolean; swingOffset?: [number,number,number]; orientation?: [number, number, number, number] }
 // World-space angular velocity (radians/second), shared by play and AI prediction.
 export interface BallState { x: number; y: number; z: number; vx: number; vy: number; vz: number; wx: number; wy: number; wz: number }
 export const SPIN = { brushGain: 9, max: 90, magnus: .0035, drag: .22, maxAcceleration: 3 };
@@ -85,7 +85,12 @@ export class Match {
  body = { x: 0, z: 4.05 };
  paddles = [{ x: 0, y: 1.9, z: 3.05, vx: 0, vy: 0, vz: 0 }, { x: 0, y: 1.9, z: -3.05, vx: 0, vy: 0, vz: 0 }];
  last: Side = 0; bounces = 0; serving = false; net = false; timer = 0; aiClock = 0; aiTarget = { x: 0, y: 1.9 }; message = 'First to 11 · win by two';
+ requireTrackedHand=false;
+ get ballVisible(){if(!this.requireTrackedHand)return true;if(this.phase==='point'||this.phase==='over')return false;return !((this.phase==='ready'||this.phase==='serve')&&this.server===0&&!this.heldHand);}
+ heldHand:{x:number;y:number;z:number}|undefined;
  holdBall() {
+  if(this.requireTrackedHand&&this.server===0&&!this.heldHand)return;
+  if(!this.multiplayer&&this.server===0&&this.heldHand){Object.assign(this.ball,this.heldHand,{vx:0,vy:0,vz:0,wx:0,wy:0,wz:0});return;}
   const p = this.paddles[this.phase === 'ready' ? 0 : this.server];
   const q = this.server === 0 ? this.paddleRotation : this.far.rotation;
   const local = localPoint(0,.6,-.22,[-q[0],-q[1],-q[2],q[3]]);
@@ -100,16 +105,18 @@ export class Match {
   this.message = `${winner === 0 ? 'You' : 'AI'} ${winner === 0 ? 'win' : 'wins'} the point · ${reason}`;
   this.timer = 1.5; this.server = serverFor(this.score);
  }
- serve() {
+ serve(upwardSpeed=4.4) {
   if (this.phase !== 'serve') return;
+  if(this.requireTrackedHand&&this.server===0&&!this.heldHand)return;
   if(this.multiplayer && this.server===1){this.mirror();try{this.serve();}finally{this.mirror();}return;}
   if (this.server === 0) {
    this.holdBall();
-   this.ball.vy = 4.4;
+   this.ball.vy = Number.isFinite(upwardSpeed)?Math.max(3,Math.min(6,upwardSpeed)):4.4;
    this.phase = 'toss'; this.timer = 0; this.message = 'Toss — swing as the ball drops'; return;
   }
   const direction = 1;
   Object.assign(this.ball, { x: this.paddles[this.server].x * .45, y: 2.15, z: -direction * 3.1, vx: 0, vy: -.5, vz: direction * 4.8, wx: 0, wy: 0, wz: 0 });
+  this.applyBrush(this.server);
   this.last = this.server; this.bounces = 0; this.serving = true; this.net = false; this.phase = 'rally'; this.timer = 0; this.message = 'Rally — track, time, return';
  }
  applyBrush(side: Side) {
@@ -142,15 +149,15 @@ export class Match {
  const oldBodyX = this.body.x;
  const oldPaddles = this.paddles.map(p => ({ ...p }));
  const clamp = (n: number, low: number, high: number) => Math.max(low, Math.min(high, n));
- this.body.x = clamp(this.body.x + (input.moveX ?? 0) * 2.4 * dt, -1.9, 1.9);
- this.body.z = clamp(this.body.z + (input.moveZ ?? 0) * 1.2 * dt, 3.75, 4.5);
+ if(Number.isFinite(input.bodyX)){this.body.x=move(this.body.x,clamp(input.bodyX!, -1.9,1.9),4.8);this.body.z=4.05;}
+ else {this.body.x = clamp(this.body.x + (input.moveX ?? 0) * 2.4 * dt, -1.9, 1.9);this.body.z = clamp(this.body.z + (input.moveZ ?? 0) * 1.2 * dt, 3.75, 4.5);}
  const player = this.paddles[0];
  const hand = this.handedness === 'right' ? 1 : -1;
- player.x = move(player.x, this.body.x + hand * .55 + (input.phone && input.swingOffset ? clamp(input.swingOffset[0], -2, 2) : clamp(input.x, -1, 1) * 2), input.phone ? 22 : 10);
+ player.x = move(player.x, this.body.x + hand * .55 + (input.phone && input.swingOffset ? clamp(input.swingOffset[0], -3, 3) : clamp(input.x, -1, 1) * 2), input.phone ? 22 : 10);
  const relative = (player.x - this.body.x) * hand;
  if (relative < -.12) this.backhand = true;
  else if (relative > .12) this.backhand = false;
- player.y = move(player.y, 1.9 + (input.phone && input.swingOffset ? clamp(input.swingOffset[1], -.8, .9) : clamp(input.y, -1, 1) * .8), input.phone ? 18 : 10);
+ player.y = move(player.y, 1.9 + (input.phone && input.swingOffset ? clamp(input.swingOffset[1], -1, 1.3) : clamp(input.y, -1, 1) * .8), input.phone ? 18 : 10);
  player.vx = (player.x - oldPaddles[0].x) / dt;
  player.vy = (player.y - oldPaddles[0].y) / dt;
  const brushAlpha = 1 - Math.exp(-dt * 24);
@@ -164,7 +171,8 @@ export class Match {
   if(this.multiplayer && this.server===1 && (this.phase==='serve'||this.phase==='toss')){
    this.mirror();try{this.step(dt,secondInput??{x:0,y:0},input);}finally{this.mirror();}return;
   }
-  if (this.phase === 'ready') { this.holdBall(); return; }
+  if(input.requireTrackedHand!==undefined)this.requireTrackedHand=input.requireTrackedHand;this.heldHand=input.heldHand;
+  if (this.phase === 'ready') { if(Number.isFinite(input.bodyX))this.movePlayer(dt,input);this.holdBall(); return; }
   if (this.phase === 'over') return;
   const move = (value: number, target: number, speed: number) => value + Math.max(-speed * dt, Math.min(speed * dt, target - value));
  const oldRotation = [...this.paddleRotation] as Rotation;

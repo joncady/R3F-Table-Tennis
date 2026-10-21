@@ -1,0 +1,10 @@
+import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';import {WebSocket} from 'ws';import {phonePage} from './phone-page-harness.mjs';
+const code=ts.transpileModule(fs.readFileSync(new URL('../src/engine.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText,{Match}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const origin='http://127.0.0.1:5174',response=await fetch('http://127.0.0.1:8787/session',{method:'POST',headers:{Origin:origin}}),session=await response.json();
+const host=new WebSocket(`ws://127.0.0.1:8787/?room=${session.room}&role=host&host=${session.host}`,{origin});await new Promise((resolve,reject)=>{host.once('open',resolve);host.once('error',reject);});
+let phone;try{phone=await phonePage({endpoint:'ws://127.0.0.1:8787/',room:session.room,kind:'android',origin,audioProbe:true});
+ const match=new Match();match.phase='rally';match.last=1;match.bounces=1;Object.assign(match.ball,{x:.55,y:1.9,z:2.89,vx:0,vy:0,vz:5});for(let i=0;i<10&&!match.impactSequence;i++)match.step(1/120,{x:0,y:0});assert.equal(match.impactSequence,1,'real simulated paddle collision emits an impact');host.send(JSON.stringify({type:'impact',strength:match.impactStrength}));
+ const until=Date.now()+2000;while(phone.sounds===0&&Date.now()<until)await new Promise(resolve=>setTimeout(resolve,10));assert.equal(phone.sounds,1);assert.equal(phone.vibrations,1);assert.equal(phone.element('impactCount').textContent,'Paddle hits received: 1');
+ const ai=new Match();ai.phase='serve';ai.server=1;ai.serve();assert.ok(ai.impacts[1]>0);host.send(JSON.stringify({type:'opponent-hit',strength:.35}));const aiUntil=Date.now()+2000;while(phone.sounds<2&&Date.now()<aiUntil)await new Promise(resolve=>setTimeout(resolve,10));assert.equal(phone.sounds,2,'AI hit plays sound');assert.equal(phone.vibrations,1,'AI hit never vibrates the player paddle');
+ console.log('Passed: simulated paddle collision → real WebSocket relay → shipped phone page → audio + vibration API calls. Physical speaker/motor output still needs device testing.');
+}finally{phone?.close();host.close();}

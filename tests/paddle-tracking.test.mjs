@@ -1,0 +1,10 @@
+import fs from 'node:fs';import ts from 'typescript';import assert from 'node:assert/strict';
+const load=async name=>import('data:text/javascript;base64,'+Buffer.from(ts.transpileModule(fs.readFileSync(new URL('../src/'+name+'.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText).toString('base64'));
+const {cameraHand,PaddleAnchor}=await load('paddleTracking'),{Match}=await load('engine');
+const pose=Array.from({length:33},()=>({x:.5,y:.5,z:0,visibility:1}));pose[11]={x:.4,y:.35,z:0,visibility:1};pose[12]={x:.6,y:.35,z:0,visibility:1};pose[15]={x:.65,y:.5,z:0,visibility:1};pose[16]={x:.35,y:.5,z:0,visibility:1};
+assert.equal(cameraHand([], 'left',0),undefined);
+for(const hand of ['left','right']){const game=new Match(hand),anchor=new PaddleAnchor();game.start();const wristIndex=hand==='left'?15:16,freeIndex=hand==='left'?16:15;
+ for(const wristX of [.3,.5,.7]){pose[wristIndex].x=wristX;pose[freeIndex].x=wristX;for(let i=0;i<120;i++){const tracked=cameraHand(pose,hand,i*1000/120),free=cameraHand(pose,hand==='left'?'right':'left',i*1000/120);game.step(1/120,{x:0,y:0,bodyX:.6,phone:true,orientation:[0,0,0,1],swingOffset:anchor.update(tracked,[0,0,0],hand,i*1000/120,1/120),heldHand:{x:.6+free.x,y:free.y,z:3.05}});}assert.ok(Math.abs(game.paddles[0].x-game.ball.x)<.01,'either hand reaches under toss across the body');assert.ok(Math.abs(game.paddles[0].y-game.ball.y)<.01,'paddle and ball use same height mapping');}
+ const held=cameraHand(pose,hand,0);let out;for(let i=0;i<120;i++)out=anchor.update({...held,at:i*16},[.4,0,0],hand,i*16,.016);assert.ok(Math.abs(out[0]+(hand==='left'?-.55:.55)-held.x)<.001,'IMU drift does not pull anchored paddle away');assert.notDeepEqual(anchor.update(undefined,[.1,.2,.3],hand,2000,.016),[.1,.2,.3],'brief wrist occlusion holds camera anchor');assert.deepEqual(anchor.update(undefined,[.1,.2,.3],hand,3000,.016),[.1,.2,.3]);
+}
+console.log('Passed: both-handed lateral/cross-body reach under free-hand toss, shared vertical mapping, resting drift isolation, and camera-loss phone fallback.');

@@ -48,7 +48,7 @@ function handle(req,res){
    }catch{res.writeHead(400);res.end('Invalid trial');}
   });return;
  }
- if(['/swing.mjs','/platform.mjs'].includes(url.pathname)){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(fs.readFileSync(path.join(root,url.pathname.slice(1))));return;}
+ if(['/swing.mjs','/platform.mjs','/marker.mjs'].includes(url.pathname)){res.writeHead(200,{'Content-Type':'text/javascript'});res.end(fs.readFileSync(url.pathname==='/marker.mjs'?path.join(root,'../public/marker.mjs'):path.join(root,url.pathname.slice(1))));return;}
  if(url.pathname==='/ca.crt'){res.writeHead(200,{'Content-Type':'application/x-x509-ca-cert','Content-Disposition':'attachment; filename="ping-pong-local-ca.crt"'});res.end(fs.readFileSync(path.join(certs,'ca.crt')));return;}
  if(url.pathname==='/controller.html'||url.pathname==='/') {res.writeHead(200,{'Content-Type':'text/html'});res.end(fs.readFileSync(path.join(root,'phone.html')));return;}
  res.writeHead(404);res.end('Not found');
@@ -70,8 +70,11 @@ function sockets(server){const wss=new WebSocketServer({server,maxPayload:2048})
    if(m.swing!==undefined&&(!Array.isArray(m.swing)||m.swing.length!==3||!m.swing.every(n=>Number.isFinite(n)&&Math.abs(n)<=1)))return;
    lastMotion=Date.now();for(const c of room.clients)if(c.role==='host')send(c,{type:'motion',...(Number.isFinite(m.sentAt)&&m.sentAt>=0?{sentAt:m.sentAt}:{}),x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(Number.isSafeInteger(m.seq)?{seq:m.seq}:{})});
   }else if(m.type==='probe'&&Number.isFinite(m.sent)&&Number.isSafeInteger(m.id)){for(const c of room.clients)if(c!==socket)send(c,{type:'probe',id:m.id,sent:m.sent});
-  }else if(role==='phone'&&['toss','pause','recenter','suspend'].includes(m.type)){for(const c of room.clients)if(c.role==='host')send(c,{type:m.type});}
-  else if(role==='host'&&m.type==='impact'&&Number.isFinite(m.strength)){for(const c of room.clients)if(c.role==='phone')send(c,{type:'impact',strength:Math.max(0,Math.min(1,m.strength))});}
+  }else if(role==='phone'&&['grip-ready','grip-failed','start','toss','pause','recenter','suspend','stop-recording'].includes(m.type)){for(const c of room.clients)if(c.role==='host')send(c,{type:m.type});}
+  else if((role==='phone'&&['alignment-start','screen-aligned'].includes(m.type)||role==='host'&&['show-marker','sync-screen'].includes(m.type))&&typeof m.nonce==='string'&&/^[a-f0-9]{8}$/.test(m.nonce)){for(const c of room.clients)if(c!==socket)send(c,{type:m.type,nonce:m.nonce});}
+  else if(role==='host'&&['align','calibrate-grip'].includes(m.type)){for(const c of room.clients)if(c.role==='phone')send(c,{type:m.type});}
+  else if(role==='host'&&m.type==='game-status'&&typeof m.message==='string'&&m.message.length<=200){for(const c of room.clients)if(c.role==='phone')send(c,{type:'game-status',message:m.message});}
+  else if(role==='host'&&['impact','opponent-hit'].includes(m.type)&&Number.isFinite(m.strength)){for(const c of room.clients)if(c.role==='phone')send(c,{type:m.type,strength:Math.max(0,Math.min(1,m.strength))});}
  });
  socket.on('close',()=>{room.clients.delete(socket);peers();});socket.on('error',()=>socket.close());
  });return wss;}

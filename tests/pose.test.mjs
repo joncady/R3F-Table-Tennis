@@ -1,0 +1,32 @@
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+import ts from 'typescript';
+import http from 'node:http';
+import {randomBytes} from 'node:crypto';
+import poseTrialPlugin from '../controller/pose-trial-plugin.mjs';
+const code=ts.transpileModule(fs.readFileSync(new URL('../src/poseTracking.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText;
+const {BodyTracker,readBody,stageAt,percentile}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+const points=(shift=0)=>Array.from({length:33},(_,i)=>({x:(i===11||i===23?.4:i===12||i===24?.6:.5)+shift,y:i<23?.35:.65,z:0,visibility:1}));
+const tracker=new BodyTracker();let now=0;
+for(let n=0;n<30;n++)tracker.update(points(),now+=33);
+assert.ok(tracker.calibrate());
+let value;for(let n=0;n<30;n++)value=tracker.update(points(-.1),now+=33);
+assert.ok(Math.abs(value.x-.5)<.001,'image-space hips translate even though root-relative world hip would stay zero');assert.ok(value.gameX>0);
+const arms=points(-.1);arms[15].x=.9;arms[16].x=.1;const before=value.x;for(let n=0;n<30;n++)value=tracker.update(arms,now+=33);assert.ok(Math.abs(value.x-before)<.001,'arm-only motion does not move the body');
+const leaning=points(-.1);leaning[11].x+=.05;leaning[12].x+=.05;value=tracker.update(leaning,now+=33);assert.ok(Math.abs(value.lean-.25)<.001);assert.ok(Math.abs(value.x-before)<.001);
+const invalid=points();invalid[23].visibility=.1;assert.equal(readBody(invalid),null);value=tracker.update(invalid,now+=100);assert.equal(value.state,'hold');const held=value.x;value=tracker.update([],now+=600);assert.equal(value.state,'lost');assert.equal(value.x,held);assert.equal(tracker.calibrate(),false);
+for(let n=0;n<30;n++)value=tracker.update(points(),now+=33);assert.ok(Math.abs(value.x)<.001,'recovery returns smoothly to calibrated center');
+const bad=points();bad[11].visibility=NaN;assert.equal(readBody(bad),null);assert.equal(readBody([]),null);
+assert.equal(stageAt(0).id,'neutral');assert.equal(stageAt(5).id,'right');assert.equal(stageAt(43).id,'neutral-end');assert.equal(stageAt(44),null);assert.equal(percentile([], .95),null);
+console.log('Passed: calibrated lateral translation/sign, arm isolation, separate torso lean, confidence rejection, dropout hold/loss, stale calibration guard, recovery, guided stages.');
+let middleware;poseTrialPlugin().configureServer({middlewares:{use(fn){middleware=fn;}}});
+const server=http.createServer((req,res)=>void middleware(req,res,()=>{res.writeHead(404);res.end();}));await new Promise(r=>server.listen(0,'127.0.0.1',r));const base=`http://127.0.0.1:${server.address().port}`;
+const id=`pose-${Date.now()}-${randomBytes(4).toString('hex')}`;
+try{
+ let response=await fetch(base+'/R3F-Table-Tennis/__pose-trial',{method:'POST',headers:{Origin:'https://other.example','Content-Type':'application/json'},body:'{}'});assert.equal(response.status,403);
+ response=await fetch(base+'/R3F-Table-Tennis/__pose-trial',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({id:'../../bad',kind:'webcam-lateral-poc',rows:[]})});assert.equal(response.status,400);
+ response=await fetch(base+'/R3F-Table-Tennis/__pose-trial',{method:'POST',headers:{Origin:base,'Content-Type':'application/json'},body:JSON.stringify({id,kind:'webcam-lateral-poc',rows:[{synthetic:true}]})});assert.equal(response.status,200);const saved=await response.json();assert.match(saved.path,/controller\/\.trials\/pose\//);assert.equal(JSON.parse(fs.readFileSync(new URL('../'+saved.path,import.meta.url))).rows[0].synthetic,true);
+ response=await fetch(base+'/R3F-Table-Tennis/__pose-trial/latest',{headers:{Origin:'https://other.example'}});assert.equal(response.status,403);
+ response=await fetch(base+'/R3F-Table-Tennis/__pose-trial/latest',{headers:{'Sec-Fetch-Site':'same-origin'}});assert.equal(response.status,200);assert.equal((await response.json()).id,id);
+}finally{server.close();const file=new URL(`../controller/.trials/pose/${id}.json`,import.meta.url);if(fs.existsSync(file))fs.unlinkSync(file);}
+console.log('Passed: loopback-only same-origin trial saving, path traversal rejection, readable local JSON; synthetic test artifact removed.');

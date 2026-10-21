@@ -1,0 +1,13 @@
+import ts from 'typescript';
+import fs from 'node:fs';
+import assert from 'node:assert/strict';
+const moduleUrl=(name,imports={})=>{let code=ts.transpileModule(fs.readFileSync(new URL('../src/'+name+'.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText;for(const [name,url]of Object.entries(imports))code=code.replaceAll("'./"+name+"'",JSON.stringify(url));return 'data:text/javascript;base64,'+Buffer.from(code).toString('base64');};
+const {calibrateLateral,lateralTarget,WebcamBodyMapper,stance}=await import(moduleUrl('webcamBody',{poseTracking:moduleUrl('poseTracking')}));
+const {Match}=await import(moduleUrl('engine'));
+const calibration=calibrateLateral(.5,.4,.65,40);
+assert.equal(lateralTarget(.4,calibration),.8);assert.equal(lateralTarget(.65,calibration),-.8);assert.equal(lateralTarget(.501,calibration),0);assert.equal(lateralTarget(-1,calibration),1.9);
+assert.throws(()=>calibrateLateral(.5,.6,.4,40));assert.throws(()=>stance([]));
+const points=(x)=>Array.from({length:33},(_,i)=>({x:x+(i===11||i===23?-.1:i===12||i===24?.1:0),y:i<23?.3:.6,z:0,visibility:1}));
+const mapper=new WebcamBodyMapper();mapper.calibration=calibration;for(let t=33;t<=990;t+=33)mapper.update(points(.4),t);assert.ok(Math.abs(mapper.x-.8)<.001);assert.ok(mapper.safe(1000));const held=mapper.x;mapper.update([],1100);assert.equal(mapper.x,held);assert.equal(mapper.safe(1600),false);mapper.update(points(.5),1700,1000);assert.equal(mapper.safe(1700),false);
+const m=new Match('left'),orientation=[0,Math.sin(.3),0,Math.cos(.3)];for(let i=0;i<120;i++)m.step(1/120,{x:0,y:0,bodyX:.8,moveX:-1,moveZ:1,phone:true,orientation});assert.ok(Math.abs(m.body.x-.8)<.001);assert.equal(m.body.z,4.05);assert.deepEqual(m.paddleRotation,orientation);assert.equal(m.phase,'ready');assert.equal(m.score[0],0);
+console.log('Passed: asymmetric marker calibration, physical scale/sign, dead zone/bounds, smoothing, lost/stale tracking, ready-state body movement, fixed depth, phone orientation preservation.');

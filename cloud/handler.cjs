@@ -47,8 +47,11 @@ exports.handler=async event=>{
   const peer=c.role==='host'?r.phoneId:r.hostId;
   if(m.type==='hello'){await Promise.all([send(id,{type:'status',connected:Boolean(peer)}),send(peer,{type:'status',connected:true})]);}
   else if(c.role==='phone'&&m.type==='motion'&&motion(m))await send(peer,{type:'motion',...(Number.isFinite(m.sentAt)&&m.sentAt>=0?{sentAt:m.sentAt}:{}),x:m.x,y:m.y,yaw:m.yaw,pitch:m.pitch,roll:m.roll,...(m.q?{q:m.q}:{}),...(m.swing?{swing:m.swing}:{}),...(m.seq!==undefined?{seq:m.seq}:{})});
-  else if(c.role==='phone'&&['toss','pause','recenter','suspend'].includes(m.type))await send(peer,{type:m.type});
-  else if(c.role==='host'&&m.type==='impact'&&Number.isFinite(m.strength))await send(peer,{type:'impact',strength:Math.max(0,Math.min(1,m.strength))});
+  else if(c.role==='phone'&&['grip-ready','grip-failed','start','toss','pause','recenter','suspend','stop-recording'].includes(m.type))await send(peer,{type:m.type});
+  else if((c.role==='phone'&&['alignment-start','screen-aligned'].includes(m.type)||c.role==='host'&&['show-marker','sync-screen'].includes(m.type))&&typeof m.nonce==='string'&&/^[a-f0-9]{8}$/.test(m.nonce))await send(peer,{type:m.type,nonce:m.nonce});
+  else if(c.role==='host'&&['align','calibrate-grip'].includes(m.type))await send(peer,{type:m.type});
+  else if(c.role==='host'&&m.type==='game-status'&&typeof m.message==='string'&&m.message.length<=200)await send(peer,{type:'game-status',message:m.message});
+  else if(c.role==='host'&&['impact','opponent-hit'].includes(m.type)&&Number.isFinite(m.strength))await send(peer,{type:m.type,strength:Math.max(0,Math.min(1,m.strength))});
   else if(m.type==='probe'&&Number.isFinite(m.sent)&&Number.isSafeInteger(m.id))await send(peer,{type:'probe',sent:m.sent,id:m.id});
   else return reply(400,{error:'Invalid message'});
   return reply(200,{ok:true});

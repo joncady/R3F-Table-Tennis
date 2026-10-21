@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: npm ci
       - name: Validate
-        run: npm test && npm run lint
+        run: npm test && npm run test:webcam && npm run lint
       - name: Build
         env:
           VITE_RELAY_HTTP: ${{ vars.PING_PONG_RELAY_HTTP }}

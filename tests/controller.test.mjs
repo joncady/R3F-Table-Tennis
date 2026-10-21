@@ -13,6 +13,13 @@ try{
  const host=await connect('host');const paired=next(host,'status',m=>m.connected);const phone=await connect('phone');assert.equal((await paired).connected,true);
  const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',sentAt:1234.5,x:.5,y:-.4,yaw:.3,pitch:.2,roll:0,q:[0,0,0,1],swing:[.1,.2,-.3]}));const packet=await motion;assert.equal(packet.x,.5);assert.equal(packet.sentAt,1234.5);assert.deepEqual(packet.q,[0,0,0,1]);assert.deepEqual(packet.swing,[.1,.2,-.3]);
  const suspended=next(host,'suspend');phone.send(JSON.stringify({type:'suspend'}));await suspended;
+ const aligned=next(phone,'align');host.send(JSON.stringify({type:'align'}));await aligned;
+ const calibration=next(phone,'calibrate-grip');host.send(JSON.stringify({type:'calibrate-grip'}));await calibration;
+ const gripReady=next(host,'grip-ready');phone.send(JSON.stringify({type:'grip-ready'}));await gripReady;
+ const started=next(host,'start');phone.send(JSON.stringify({type:'start'}));await started;
+ const gameState=next(phone,'game-status');host.send(JSON.stringify({type:'game-status',message:'Ready — tap Start'}));assert.equal((await gameState).message,'Ready — tap Start');
+ const stoppedRecording=next(host,'stop-recording');phone.send(JSON.stringify({type:'stop-recording'}));await stoppedRecording;
+ for(const [from,to,type]of [[phone,host,'alignment-start'],[host,phone,'show-marker'],[host,phone,'sync-screen'],[phone,host,'screen-aligned']]){const ack=next(to,type);from.send(JSON.stringify({type,nonce:'1234abcd'}));assert.equal((await ack).nonce,'1234abcd');}
  const toss=next(host,'toss');phone.send(JSON.stringify({type:'toss'}));await toss;
  const hit=next(phone,'impact');host.send(JSON.stringify({type:'impact',strength:20}));assert.equal((await hit).strength,1);
  let bad=false;const listener=raw=>{if(JSON.parse(raw).type==='motion')bad=true;};host.on('message',listener);phone.send(JSON.stringify({type:'motion',x:'bad',y:0,yaw:0,pitch:0,roll:0}));await new Promise(r=>setTimeout(r,60));assert.equal(bad,false);host.off('message',listener);

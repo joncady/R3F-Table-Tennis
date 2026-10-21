@@ -14,6 +14,7 @@ try{
  const motion=next(host,'motion');phone.send(JSON.stringify({type:'motion',sentAt:1234.5,seq:1,x:.4,y:-.2,yaw:.3,pitch:.1,roll:0,q:[0,0,0,1],swing:[.2,0,-.1]}));const pose=await motion;assert.deepEqual(pose.swing,[.2,0,-.1]);assert.equal(pose.seq,1);assert.equal(pose.sentAt,1234.5);
  const pause=next(host,'pause');phone.send(JSON.stringify({type:'pause'}));await pause;
  const impact=next(phone,'impact');host.send(JSON.stringify({type:'impact',strength:.7}));assert.equal((await impact).strength,.7);
+ for(const [from,to,type]of [[phone,host,'alignment-start'],[host,phone,'show-marker'],[host,phone,'sync-screen'],[phone,host,'screen-aligned']]){const ack=next(to,type);from.send(JSON.stringify({type,nonce:'1234abcd'}));assert.equal((await ack).nonce,'1234abcd');}
  const toss=next(host,'toss');phone.send(JSON.stringify({type:'toss'}));await toss;
  const rtt=[];for(let id=1;id<=10;id++){const response=next(phone,'probe',m=>m.id===id),sent=performance.now();phone.send(JSON.stringify({type:'probe',id,sent}));await response;rtt.push(performance.now()-sent);}
  const received=[];const listener=raw=>{const m=JSON.parse(raw);if(m.type==='motion')received.push(m.seq);};host.on('message',listener);

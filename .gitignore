@@ -41,3 +41,7 @@ public/platform.mjs
 
 multiplayer/engine.mjs
 multiplayer/template.generated.json
+
+public/pose-runtime/
+
+public/marker.mjs

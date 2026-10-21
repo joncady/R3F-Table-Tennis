@@ -1,0 +1,17 @@
+import fs from 'node:fs';import ts from 'typescript';import assert from 'node:assert/strict';
+const code=ts.transpileModule(fs.readFileSync(new URL('../src/playtestRecording.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText;
+const {startPlaytestRecording}=await import('data:text/javascript;base64,'+Buffer.from(code).toString('base64'));
+let now=0,interval,ended,stopped=0,outputs=[],constraints;
+Object.defineProperty(globalThis,'performance',{value:{now:()=>now},configurable:true});
+const track={stop(){stopped++;},addEventListener(name,fn){assert.equal(name,'ended');ended=fn;}};
+const stream={getTracks:()=>[track],getVideoTracks:()=>[track],getAudioTracks:()=>[]};
+Object.defineProperty(globalThis,'navigator',{value:{mediaDevices:{getDisplayMedia:async opts=>{constraints=opts;return stream;}}},configurable:true});
+globalThis.setInterval=fn=>{interval=fn;return 1;};globalThis.clearInterval=()=>{};
+globalThis.MediaRecorder=class{static isTypeSupported(){return true;}constructor(){this.mimeType='video/webm';this.state='inactive';}start(){this.state='recording';}stop(){assert.equal(this.state,'recording');this.state='inactive';this.ondataavailable({data:new Blob(['captured-video'])});this.onstop();}};
+const live={score:[0,0]},options={sample:()=>live,tick(){},error(message){assert.fail(message);},finished:(video,report)=>outputs.push({video,report})};
+const stop=await startPlaytestRecording(options);assert.equal(constraints.audio,true);assert.equal(constraints.video.frameRate,30);
+live.score[0]=1;now=65000;interval();assert.equal(outputs.length,0,'no fixed duration cutoff');stop();stop();
+assert.equal(outputs.length,1);assert.equal(stopped,1);assert.equal(await outputs[0].video.text(),'captured-video');assert.equal(outputs[0].report.rows[0].data.score[0],0,'telemetry is a snapshot');assert.equal(outputs[0].report.rows[1].data.score[0],1);assert.equal(outputs[0].report.hasAudio,false);assert.equal(outputs[0].report.duration,65);
+await startPlaytestRecording(options);ended();assert.equal(outputs.length,2,'browser Stop sharing finalizes recording');
+navigator.mediaDevices.getDisplayMedia=async()=>{throw Object.assign(Error('Cancelled'),{name:'NotAllowedError'});};await assert.rejects(()=>startPlaytestRecording(options),{name:'NotAllowedError'});
+console.log('Passed: full-length capture, telemetry snapshots, video export, user stop, browser stop-sharing, track cleanup and chooser cancellation.');
