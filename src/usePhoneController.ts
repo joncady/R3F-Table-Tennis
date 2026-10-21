@@ -11,13 +11,19 @@ export default function usePhoneController(
   const [status, setStatus] = useState('Relay not paired');
   const [connected, setConnected] = useState(false),
     [aligned, setAligned] = useState(false),
-    [syncing, setSyncing] = useState(false);
+    [syncing, setSyncing] = useState(false),
+    [markerRequest, setMarkerRequest] = useState<
+      'idle' | 'requesting' | 'shown' | 'error'
+    >('idle');
   const markerNonce = useRef(''),
     awaitingSync = useRef(false),
-    syncTimer = useRef<ReturnType<typeof setTimeout>>();
+    syncTimer = useRef<ReturnType<typeof setTimeout>>(),
+    markerTimer = useRef<ReturnType<typeof setTimeout>>();
   const invalidateAlignment = () => {
     setAligned(false);
     setSyncing(false);
+    setMarkerRequest('idle');
+    clearTimeout(markerTimer.current);
     awaitingSync.current = false;
     clearTimeout(syncTimer.current);
   };
@@ -51,6 +57,9 @@ export default function usePhoneController(
       );
       if (!response.ok) throw Error('Relay rejected pairing');
       const session = await response.json();
+      const controllerUrl = new URL(session.phoneUrl);
+      controllerUrl.searchParams.set('v', __APP_VERSION__);
+      session.phoneUrl = controllerUrl.href;
       if (screenFace) {
         const url = new URL(session.phoneUrl),
           hash = url.hash.slice(1),
@@ -97,6 +106,7 @@ export default function usePhoneController(
         const m = JSON.parse(e.data);
         if (m.type === 'alignment-start' && m.nonce === markerNonce.current) {
           invalidateAlignment();
+          setMarkerRequest('shown');
           handler.current('alignment-start');
         } else if (
           m.type === 'screen-aligned' &&
@@ -181,10 +191,15 @@ export default function usePhoneController(
   };
   const showMarker = () => {
     invalidateAlignment();
-    if (socket.current?.readyState === WebSocket.OPEN)
-      socket.current.send(
-        JSON.stringify({ type: 'show-marker', nonce: markerNonce.current }),
-      );
+    if (socket.current?.readyState !== WebSocket.OPEN || !connected) {
+      setMarkerRequest('error');
+      return;
+    }
+    setMarkerRequest('requesting');
+    socket.current.send(
+      JSON.stringify({ type: 'show-marker', nonce: markerNonce.current }),
+    );
+    markerTimer.current = setTimeout(() => setMarkerRequest('error'), 5000);
   };
   const align = () => {
     if (socket.current?.readyState === WebSocket.OPEN)
@@ -212,6 +227,7 @@ export default function usePhoneController(
     () => () => {
       generation.current++;
       clearTimeout(syncTimer.current);
+      clearTimeout(markerTimer.current);
       socket.current?.close();
     },
     [],
@@ -221,6 +237,7 @@ export default function usePhoneController(
     syncing,
     syncScreen,
     showMarker,
+    markerRequest,
     diagnostics: () => ({
       phoneAgeMs: pose.current
         ? Math.round(performance.now() - pose.current.received)

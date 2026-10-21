@@ -550,7 +550,7 @@ export default function WebcamGame() {
                   {webcam.mode === 'camera' && !webcam.safe
                     ? 'Finding your position…'
                     : webcam.safe
-                      ? 'Aligned. Ready to play.'
+                      ? 'Camera tracking ready.'
                       : 'The game starts automatically when you’re in view.'}
                 </p>
               </section>
@@ -571,8 +571,17 @@ export default function WebcamGame() {
                     phone.showMarker();
                   }}
                 >
-                  Show alignment marker
+                  Show marker on phone
                 </button>
+                {phone.markerRequest !== 'idle' && !phone.aligned && (
+                  <p role="status">
+                    {phone.markerRequest === 'requesting'
+                      ? 'Opening the marker on your paired phone…'
+                      : phone.markerRequest === 'shown'
+                        ? 'Marker opened on your phone. Point that screen toward the webcam.'
+                        : 'Your phone did not respond. Open its controller page, then retry. Refresh and scan a new pairing QR if needed.'}
+                  </p>
+                )}
               </section>
             </div>
             <div className="simple-hand">
