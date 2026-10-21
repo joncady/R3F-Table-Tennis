@@ -1,19 +1,20 @@
-import EquipmentPanel from './EquipmentPanel';
-import { useEquipment } from './equipment';
-import ReleaseBadge from './ReleaseBadge';
-import { Suspense, useEffect, useRef, useState } from 'react';
-import { Canvas } from '@react-three/fiber';
-import { Court } from './App';
-import { Match, PlayerInput } from './engine';
-import usePhoneController from './usePhoneController';
-import useWebcamBody from './useWebcamBody';
-import { PlayGate } from './onboarding';
-import './webcamGame.css';
-import { recordOrientationTrial } from './orientationTrial';
-import useSessionMarker from './useSessionMarker';
-import useDiagnostics from './useDiagnostics';
-import { startPlaytestRecording } from './playtestRecording';
-function newGame(hand: 'left' | 'right') {
+import RecordingLibrary from "./RecordingLibrary";
+import EquipmentPanel from "./EquipmentPanel";
+import { useEquipment } from "./equipment";
+import ReleaseBadge from "./ReleaseBadge";
+import { Suspense, useEffect, useRef, useState } from "react";
+import { Canvas } from "@react-three/fiber";
+import { Court } from "./App";
+import { Match, PlayerInput } from "./engine";
+import usePhoneController from "./usePhoneController";
+import useWebcamBody from "./useWebcamBody";
+import { PlayGate } from "./onboarding";
+import "./webcamGame.css";
+import { recordOrientationTrial } from "./orientationTrial";
+import useSessionMarker from "./useSessionMarker";
+import useDiagnostics from "./useDiagnostics";
+import { startPlaytestRecording } from "./playtestRecording";
+function newGame(hand: "left" | "right") {
   const match = new Match(hand);
   match.requireTrackedHand = true;
   return match;
@@ -25,35 +26,28 @@ export default function WebcamGame() {
   const [recording, setRecording] = useState(false),
     [recordBusy, setRecordBusy] = useState(false),
     [recordSeconds, setRecordSeconds] = useState(0),
-    [recordStatus, setRecordStatus] = useState(''),
-    [recordFiles, setRecordFiles] = useState<{
-      video: string;
-      data: string;
-      name: string;
-      extension: string;
-    } | null>(null);
+    [recordStatus, setRecordStatus] = useState(""),
+    [recordRevision, setRecordRevision] = useState(0);
   const recordStop = useRef<(() => void) | undefined>(),
-    recordUrls = useRef<string[]>([]),
     recordMounted = useRef(true);
   useEffect(() => {
     recordMounted.current = true;
     return () => {
       recordMounted.current = false;
       recordStop.current?.();
-      recordUrls.current.forEach((url) => URL.revokeObjectURL(url));
     };
   }, []);
 
   const [trialRunning, setTrialRunning] = useState(false),
-    [trialStatus, setTrialStatus] = useState(''),
+    [trialStatus, setTrialStatus] = useState(""),
     trialCanvas = useRef<HTMLCanvasElement>(null),
     trialStop = useRef<(() => void) | undefined>();
   useEffect(() => () => trialStop.current?.(), []);
-  const [match, setMatch] = useState(() => newGame('left')),
-    [hand, setHand] = useState<'left' | 'right'>('left'),
+  const [match, setMatch] = useState(() => newGame("left")),
+    [hand, setHand] = useState<"left" | "right">("left"),
     [paused, setPaused] = useState(true),
     [advanced, setAdvanced] = useState(false),
-    [notice, setNotice] = useState(''),
+    [notice, setNotice] = useState(""),
     [startupMs, setStartupMs] = useState<number | null>(null);
   const input = useRef<PlayerInput>({ x: 0, y: 0, moveX: 0, moveZ: 0 }),
     [, render] = useState(0),
@@ -68,44 +62,44 @@ export default function WebcamGame() {
   const update = () => render((n) => n + 1);
   const phone = usePhoneController(
     (command) => {
-      if (command === 'alignment-start') {
+      if (command === "alignment-start") {
         setPaused(true);
         autoPending.current = true;
         gate.current.reset();
         return;
       }
-      if (command === 'stop-recording') {
+      if (command === "stop-recording") {
         recordStop.current?.();
         return;
       }
-      if (command === 'start') {
+      if (command === "start") {
         play();
         return;
       }
-      if (command === 'pause') {
+      if (command === "pause") {
         if (paused) play();
         else setPaused(true);
         return;
       }
-      if (command === 'toss') {
+      if (command === "toss") {
         if (!ready()) return;
         const held = webcam.control.current.hand;
         if (!held || performance.now() - held.at > 250) {
-          setNotice('Show your throwing hand before tossing.');
+          setNotice("Show your throwing hand before tossing.");
           return;
         }
         match.heldHand = { x: held.x, y: held.y, z: 3.05 };
         if (paused) play();
-        if (match.phase === 'ready') match.start();
+        if (match.phase === "ready") match.start();
         match.serve();
         update();
         return;
       }
-      if (command === 'disconnected' || command === 'suspend') {
+      if (command === "disconnected" || command === "suspend") {
         setPaused(true);
         return;
       }
-      if (command === 'recenter') {
+      if (command === "recenter") {
         input.current.x = 0;
         input.current.y = 0;
         input.current.swingOffset = undefined;
@@ -116,24 +110,24 @@ export default function WebcamGame() {
   );
   webcam.handedness.current = hand;
   webcam.tossEnabled.current =
-    phone.aligned && !paused && match.phase === 'serve' && match.server === 0;
+    phone.aligned && !paused && match.phase === "serve" && match.server === 0;
   function ready() {
     if (!phone.connected) {
-      setNotice('Connect your phone first.');
+      setNotice("Connect your phone first.");
       return false;
     }
-    if (webcam.mode !== 'camera') {
-      setNotice('Enable your webcam to play.');
+    if (webcam.mode !== "camera") {
+      setNotice("Enable your webcam to play.");
       return false;
     }
     if (!phone.aligned) {
       setNotice(
-        'Show the phone’s session marker to the webcam to align before playing.',
+        "Show the phone’s session marker to the webcam to align before playing.",
       );
       return false;
     }
     if (!webcam.safe) {
-      setNotice('Step into view so the camera can see your shoulders.');
+      setNotice("Step into view so the camera can see your shoulders.");
       return false;
     }
     return true;
@@ -143,12 +137,12 @@ export default function WebcamGame() {
     autoPending.current = false;
     setEquipmentOpen(false);
     setAdvanced(false);
-    setNotice('');
-    if (match.phase === 'over') {
+    setNotice("");
+    if (match.phase === "over") {
       const next = newGame(hand);
       next.start();
       setMatch(next);
-    } else if (match.phase === 'ready') match.start();
+    } else if (match.phase === "ready") match.start();
     setPaused(false);
     update();
     if (enableAt.current && startupMs === null)
@@ -164,7 +158,7 @@ export default function WebcamGame() {
   const enable = async () => {
     phone.showMarker();
     setPaused(true);
-    setNotice('');
+    setNotice("");
     enableAt.current = performance.now();
     setStartupMs(null);
     autoPending.current = true;
@@ -180,7 +174,7 @@ export default function WebcamGame() {
         gate.current.update(
           performance.now(),
           phone.connected && phone.aligned,
-          webcam.mode === 'camera',
+          webcam.mode === "camera",
           webcam.safe,
         )
       ) {
@@ -194,7 +188,7 @@ export default function WebcamGame() {
     if (
       !phone.connected ||
       !phone.aligned ||
-      webcam.mode !== 'camera' ||
+      webcam.mode !== "camera" ||
       !webcam.safe
     )
       setPaused(true);
@@ -209,7 +203,7 @@ export default function WebcamGame() {
     webcam.video,
     phone.pairing?.marker,
     phone.connected &&
-      webcam.mode === 'camera' &&
+      webcam.mode === "camera" &&
       !phone.aligned &&
       !phone.syncing,
     phone.syncScreen,
@@ -222,13 +216,13 @@ export default function WebcamGame() {
       ...phone.diagnostics(),
       cameraLatencyMs: Math.round(webcam.latency),
       confidence: Math.round(webcam.confidence * 100),
-      tracking: webcam.safe ? 'ready' : 'lost',
+      tracking: webcam.safe ? "ready" : "lost",
       alignment: phone.aligned
-        ? 'synced'
+        ? "synced"
         : phone.syncing
-          ? 'syncing'
-          : 'required',
-      backend: webcam.backend || 'loading',
+          ? "syncing"
+          : "required",
+      backend: webcam.backend || "loading",
     };
   });
   useEffect(() => {
@@ -248,22 +242,22 @@ export default function WebcamGame() {
     if (webcam.calibrationCue && phone.connected) fineTuneRef.current();
   }, [webcam.calibrationCue, phone.connected]);
   const message = !phone.connected
-    ? 'Connect your phone to the game.'
-    : webcam.mode !== 'camera'
-      ? 'Enable webcam on the computer.'
+    ? "Connect your phone to the game."
+    : webcam.mode !== "camera"
+      ? "Enable webcam on the computer."
       : !phone.aligned
-        ? 'Show your phone’s marker to the webcam to align.'
+        ? "Show your phone’s marker to the webcam to align."
         : !webcam.safe
-          ? 'Step into view — shoulders visible.'
+          ? "Step into view — shoulders visible."
           : paused
-            ? 'Ready — tap Play / resume.'
-            : match.phase === 'serve'
+            ? "Ready — tap Play / resume."
+            : match.phase === "serve"
               ? match.server === 0
-                ? 'Your serve — lift your free hand or tap Toss.'
-                : 'AI serving.'
-              : match.phase === 'over'
-                ? 'Match finished — tap Play for another game.'
-                : 'Playing — swing to return.';
+                ? "Your serve — lift your free hand or tap Toss."
+                : "AI serving."
+              : match.phase === "over"
+                ? "Match finished — tap Play for another game."
+                : "Playing — swing to return.";
   const reportRef = useRef(phone.reportStatus);
   reportRef.current = phone.reportStatus;
   useEffect(() => {
@@ -273,23 +267,23 @@ export default function WebcamGame() {
     const key = (e: KeyboardEvent) => {
       if (
         e.target instanceof HTMLElement &&
-        ['INPUT', 'SELECT', 'TEXTAREA'].includes(e.target.tagName)
+        ["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)
       )
         return;
-      if (e.code === 'Escape') setPaused(true);
-      if (e.code === 'KeyF' && !e.repeat) {
+      if (e.code === "Escape") setPaused(true);
+      if (e.code === "KeyF" && !e.repeat) {
         e.preventDefault();
         if (document.fullscreenElement) void document.exitFullscreen();
         else
           void host.current
             ?.requestFullscreen()
             .catch(() =>
-              setNotice('Fullscreen is unavailable in this browser.'),
+              setNotice("Fullscreen is unavailable in this browser."),
             );
       }
     };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
   }, []);
   const recordingSample = useRef(() => ({}));
   recordingSample.current = () => ({
@@ -308,52 +302,41 @@ export default function WebcamGame() {
     if (recordStop.current) {
       recordStop.current();
       setRecordBusy(true);
-      setRecordStatus('Saving playtest…');
+      setRecordStatus("Saving playtest…");
       return;
     }
     setRecordBusy(true);
     setRecordStatus(
-      'Choose the game tab or window in the screen-sharing prompt.',
+      "Choose the game tab or window in the screen-sharing prompt.",
     );
     try {
       recordStop.current = await startPlaytestRecording({
         sample: () => recordingSample.current(),
         tick: setRecordSeconds,
         error: setRecordStatus,
-        finished: (video, report) => {
+        finished: (saved) => {
           recordStop.current = undefined;
           if (!recordMounted.current) return;
-          recordUrls.current.forEach((url) => URL.revokeObjectURL(url));
-          const videoUrl = URL.createObjectURL(video),
-            dataUrl = URL.createObjectURL(
-              new Blob([JSON.stringify(report)], { type: 'application/json' }),
-            ),
-            name = `ping-pong-playtest-${Date.now()}`,
-            extension = video.type.includes('mp4') ? 'mp4' : 'webm';
-          recordUrls.current = [videoUrl, dataUrl];
-          setRecordFiles({ video: videoUrl, data: dataUrl, name, extension });
+          setRecordRevision((n) => n + 1);
           setRecording(false);
           setRecordBusy(false);
           setRecordStatus(
-            'Playtest saved to Downloads. Video and motion data are also available below.',
+            saved.status === "complete"
+              ? "Playtest saved locally. Open Developer tools → Saved recordings to export."
+              : "Recording interrupted. Open Saved recordings to recover the captured portion.",
           );
-          const link = document.createElement('a');
-          link.href = videoUrl;
-          link.download = `${name}.${extension}`;
-          link.click();
         },
       });
       setRecording(true);
       setRecordSeconds(0);
-      setRecordFiles(null);
       setRecordStatus(
-        'Recording · stop here, on your phone, or with the browser’s Stop sharing button.',
+        "Recording · stop here, on your phone, or with the browser’s Stop sharing button.",
       );
       setAdvanced(false);
     } catch (e) {
       setRecordStatus(
-        e instanceof Error && e.name === 'NotAllowedError'
-          ? 'Screen recording cancelled.'
+        e instanceof Error && e.name === "NotAllowedError"
+          ? "Screen recording cancelled."
           : String(e),
       );
     } finally {
@@ -362,10 +345,10 @@ export default function WebcamGame() {
   }
   async function startRotationTrial() {
     const video = webcam.video.current,
-      game = host.current?.querySelector('canvas'),
+      game = host.current?.querySelector("canvas"),
       preview = trialCanvas.current;
     if (!phone.connected || !video?.videoWidth || !game || !preview) {
-      setTrialStatus('Connect your phone and enable webcam first.');
+      setTrialStatus("Connect your phone and enable webcam first.");
       return;
     }
     setTrialRunning(true);
@@ -395,7 +378,7 @@ export default function WebcamGame() {
   }
   const showSetup =
     !trialRunning &&
-    (paused || match.phase === 'ready' || match.phase === 'over');
+    (paused || match.phase === "ready" || match.phase === "over");
   return (
     <main ref={host} className="play-game">
       <header>
@@ -420,7 +403,7 @@ export default function WebcamGame() {
               else setPaused(true);
             }}
           >
-            {paused ? 'Play' : 'Pause'}
+            {paused ? "Play" : "Pause"}
           </button>
           <button
             onClick={() => {
@@ -453,9 +436,9 @@ export default function WebcamGame() {
       </header>
       <Canvas
         gl={{ preserveDrawingBuffer: true }}
-        frameloop={paused && !trialRunning ? 'never' : 'always'}
+        frameloop={paused && !trialRunning ? "never" : "always"}
       >
-        <color attach="background" args={['#102a34']} />
+        <color attach="background" args={["#102a34"]} />
         <Suspense fallback={null}>
           <Court
             paddleEquipment={equipment}
@@ -476,9 +459,9 @@ export default function WebcamGame() {
         </Suspense>
       </Canvas>
       <div
-        className={`play-camera ${showSetup ? 'setup-camera' : ''}`}
-        style={{ visibility: webcam.mode === 'camera' ? 'visible' : 'hidden' }}
-        aria-hidden={webcam.mode !== 'camera'}
+        className={`play-camera ${showSetup ? "setup-camera" : ""}`}
+        style={{ visibility: webcam.mode === "camera" ? "visible" : "hidden" }}
+        aria-hidden={webcam.mode !== "camera"}
       >
         <video ref={webcam.video} muted playsInline />
         <canvas ref={webcam.canvas} />
@@ -488,17 +471,17 @@ export default function WebcamGame() {
           <article>
             <small>PLAY WITH YOUR PHONE + WEBCAM</small>
             <h1>
-              {match.phase === 'over'
-                ? 'Good game.'
-                : match.phase === 'ready'
-                  ? 'Pick up your paddle.'
-                  : 'Take a breath.'}
+              {match.phase === "over"
+                ? "Good game."
+                : match.phase === "ready"
+                  ? "Pick up your paddle."
+                  : "Take a breath."}
             </h1>
             <p>{message}</p>
             <div className="setup-steps">
-              <section className={phone.connected ? 'complete' : ''}>
-                <h2>1 · Connect phone {phone.connected && '✓'}</h2>
-                <small>Session {phone.pairing?.sessionCode || '…'}</small>
+              <section className={phone.connected ? "complete" : ""}>
+                <h2>1 · Connect phone {phone.connected && "✓"}</h2>
+                <small>Session {phone.pairing?.sessionCode || "…"}</small>
                 {!phone.connected && phone.pairing ? (
                   <>
                     <img
@@ -519,7 +502,7 @@ export default function WebcamGame() {
                 ) : (
                   <p>
                     {phone.connected
-                      ? 'Phone connected. Hold it naturally like a paddle.'
+                      ? "Phone connected. Hold it naturally like a paddle."
                       : phone.status}
                   </p>
                 )}
@@ -530,7 +513,7 @@ export default function WebcamGame() {
                 )}
               </section>
               <section>
-                <h2>2 · Enable webcam {webcam.mode === 'camera' && '✓'}</h2>
+                <h2>2 · Enable webcam {webcam.mode === "camera" && "✓"}</h2>
                 <p>
                   Stand where your shoulders and hands are visible. Show your
                   shoulders and hands. Then hold your phone’s marker toward the
@@ -541,26 +524,26 @@ export default function WebcamGame() {
                   onClick={() => void enable()}
                 >
                   {webcam.busy
-                    ? 'Starting camera…'
-                    : webcam.mode === 'camera'
-                      ? 'Recenter camera'
-                      : 'Enable webcam'}
+                    ? "Starting camera…"
+                    : webcam.mode === "camera"
+                      ? "Recenter camera"
+                      : "Enable webcam"}
                 </button>
                 <p>
-                  {webcam.mode === 'camera' && !webcam.safe
-                    ? 'Finding your position…'
+                  {webcam.mode === "camera" && !webcam.safe
+                    ? "Finding your position…"
                     : webcam.safe
-                      ? 'Camera tracking ready.'
-                      : 'The game starts automatically when you’re in view.'}
+                      ? "Camera tracking ready."
+                      : "The game starts automatically when you’re in view."}
                 </p>
               </section>
-              <section className={phone.aligned ? 'complete' : ''}>
-                <h2>3 · Align paddle {phone.aligned && '✓'}</h2>
+              <section className={phone.aligned ? "complete" : ""}>
+                <h2>3 · Align paddle {phone.aligned && "✓"}</h2>
                 <p>
                   {phone.aligned
-                    ? 'Phone and webcam synchronized. Hold your paddle naturally.'
+                    ? "Phone and webcam synchronized. Hold your paddle naturally."
                     : phone.syncing
-                      ? 'Synchronizing phone…'
+                      ? "Synchronizing phone…"
                       : markerStatus}
                 </p>
                 <button
@@ -573,20 +556,20 @@ export default function WebcamGame() {
                 >
                   Show marker on phone
                 </button>
-                {phone.markerRequest !== 'idle' && !phone.aligned && (
+                {phone.markerRequest !== "idle" && !phone.aligned && (
                   <p role="status">
-                    {phone.markerRequest === 'requesting'
-                      ? 'Opening the marker on your paired phone…'
-                      : phone.markerRequest === 'shown'
-                        ? 'Marker opened on your phone. Point that screen toward the webcam.'
-                        : 'Your phone did not respond. Open its controller page, then retry. Refresh and scan a new pairing QR if needed.'}
+                    {phone.markerRequest === "requesting"
+                      ? "Opening the marker on your paired phone…"
+                      : phone.markerRequest === "shown"
+                        ? "Marker opened on your phone. Point that screen toward the webcam."
+                        : "Your phone did not respond. Open its controller page, then retry. Refresh and scan a new pairing QR if needed."}
                   </p>
                 )}
               </section>
             </div>
             <div className="simple-hand">
               <span>Playing hand</span>
-              {(['left', 'right'] as const).map((value) => (
+              {(["left", "right"] as const).map((value) => (
                 <button
                   key={value}
                   aria-pressed={hand === value}
@@ -596,7 +579,7 @@ export default function WebcamGame() {
                     update();
                   }}
                 >
-                  {value === 'left' ? 'Left' : 'Right'}
+                  {value === "left" ? "Left" : "Right"}
                 </button>
               ))}
             </div>
@@ -624,27 +607,13 @@ export default function WebcamGame() {
         </section>
       )}
 
-      {advanced && (recordStatus || recordFiles) && (
+      {advanced && recordStatus && (
         <aside className="playtest-recording" role="status">
           <span>{recordStatus}</span>
-          {recordFiles && (
-            <>
-              <a
-                href={recordFiles.video}
-                download={`${recordFiles.name}.${recordFiles.extension}`}
-              >
-                Download video
-              </a>
-              <a href={recordFiles.data} download={`${recordFiles.name}.json`}>
-                Download motion data
-              </a>
-            </>
-          )}
           {!recording && !recordBusy && (
             <button
               onClick={() => {
-                setRecordStatus('');
-                setRecordFiles(null);
+                setRecordStatus("");
               }}
             >
               Dismiss
@@ -653,8 +622,8 @@ export default function WebcamGame() {
         </aside>
       )}
       <section
-        className={`rotation-trial ${trialRunning ? 'recording' : ''}`}
-        style={{ display: trialRunning || trialStatus ? 'block' : 'none' }}
+        className={`rotation-trial ${trialRunning ? "recording" : ""}`}
+        style={{ display: trialRunning || trialStatus ? "block" : "none" }}
       >
         <p role="status">{trialStatus}</p>
         <canvas ref={trialCanvas} />
@@ -664,7 +633,7 @@ export default function WebcamGame() {
           </button>
         )}
         {!trialRunning && (
-          <button onClick={() => setTrialStatus('')}>Dismiss</button>
+          <button onClick={() => setTrialStatus("")}>Dismiss</button>
         )}
       </section>
       {equipmentOpen && (
@@ -677,7 +646,7 @@ export default function WebcamGame() {
             setPaused(true);
           }}
           close={() => setEquipmentOpen(false)}
-          locked={match.phase !== 'ready' && match.phase !== 'over'}
+          locked={match.phase !== "ready" && match.phase !== "over"}
         />
       )}
       {advanced && (
@@ -695,16 +664,20 @@ export default function WebcamGame() {
               </div>
             ))}
           </dl>
+          <RecordingLibrary
+            revision={recordRevision}
+            active={recording || recordBusy}
+          />
           <h3>Playtest recording</h3>
           <button
             disabled={recordBusy || trialRunning}
             onClick={() => void recordPlaytest()}
           >
             {recordBusy
-              ? 'Please wait…'
+              ? "Please wait…"
               : recording
-                ? `Stop recording · ${Math.floor(recordSeconds / 60)}:${String(Math.floor(recordSeconds % 60)).padStart(2, '0')}`
-                : 'Record playtest'}
+                ? `Stop recording · ${Math.floor(recordSeconds / 60)}:${String(Math.floor(recordSeconds % 60)).padStart(2, "0")}`
+                : "Record playtest"}
           </button>
           <h3>Tracking & tuning</h3>
           <button
@@ -719,13 +692,13 @@ export default function WebcamGame() {
           </p>
           <p>{webcam.status}</p>
           <p>
-            {phone.status} · camera {webcam.confidence.toFixed(2)} ·{' '}
+            {phone.status} · camera {webcam.confidence.toFixed(2)} ·{" "}
             {webcam.latency.toFixed(0)} ms · {webcam.backend}
           </p>
           <p>{webcam.handStatus}</p>
           <p>
             {startupMs === null
-              ? 'Startup timer begins at Enable webcam.'
+              ? "Startup timer begins at Enable webcam."
               : `Camera click → playable: ${(startupMs / 1000).toFixed(2)} seconds`}
           </p>
           <button
@@ -738,7 +711,7 @@ export default function WebcamGame() {
           </button>
           {phone.pairing?.certificateUrl && (
             <p>
-              First local connection:{' '}
+              First local connection:{" "}
               <a href={phone.pairing.certificateUrl}>local CA certificate</a>.
               Trust the prototype certificate on your phone before connecting.
             </p>
@@ -779,10 +752,10 @@ export default function WebcamGame() {
             New game
           </button>
           {[
-            ['Grip → blade center', paddlePivot, setPaddlePivot, 0.15, 0.65],
-            ['Phone reach', phoneSensitivity, setPhoneSensitivity, 0.5, 3],
-            ['Lateral reach', lateralFollow, setLateralFollow, 1, 10],
-            ['Camera follow', cameraStrength, setCameraStrength, 0, 1],
+            ["Grip → blade center", paddlePivot, setPaddlePivot, 0.15, 0.65],
+            ["Phone reach", phoneSensitivity, setPhoneSensitivity, 0.5, 3],
+            ["Lateral reach", lateralFollow, setLateralFollow, 1, 10],
+            ["Camera follow", cameraStrength, setCameraStrength, 0, 1],
           ].map(([label, value, set, min, max]) => (
             <label key={String(label)}>
               {String(label)}

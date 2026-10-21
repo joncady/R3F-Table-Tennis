@@ -33,7 +33,7 @@ Local phone pairing needs the same Wi-Fi and trusted HTTPS: the relay provides a
 
 Both screens keep recording and detailed telemetry behind **Developer tools**. Desktop diagnostics show render FPS, browser frame cadence/slow frames, camera latency/confidence/backend, phone sample age, interpolation delay and alignment state. Phone diagnostics show orientation/acceleration rate, outgoing queue size, round-trip time, orientation and impact count. These are runtime indicators, not physical tracking accuracy measurements.
 
-Desktop Developer tools also contains full playtest recording, the short orientation trial, grip/reach/camera tuning, tracking-model checks and links to measurement labs/multiplayer. Full recording starts from a desktop click and uses the browser’s screen chooser. Stop on the desktop, in the phone developer menu, or with Stop sharing. A video downloads automatically; optional synchronized 10 Hz motion/game data is a separate download. Browser-shared audio is included when available; phone speaker sound is not. No microphone is requested. Keep the page open until saving finishes. Recordings stay local.
+Desktop Developer tools contains full playtest recording, Saved recordings, the short orientation trial, grip/reach/camera tuning, tracking-model checks and links to measurement labs/multiplayer. Full recording starts from a desktop click and uses the browser’s screen chooser. Stop on the desktop, in the phone developer menu, or with Stop sharing. Video chunks are persisted locally about once per second, and synchronized 10 Hz motion/game data is flushed in batches of up to 100 samples. Capture holds at most 16 MiB of pending chunks; slow/full storage stops capture with a recovery message. Saved recordings survives reloads and offers video/data export and explicit deletion. Partial captures retain previously committed chunks; their final frames or telemetry batch may be missing after a crash. Storage is browser-local and can be cleared or evicted, so export important captures. Supported save pickers stream exports to disk one chunk at a time; other browsers assemble a Blob only during export. Browser-shared audio is included when available; phone speaker sound is not. No microphone is requested.
 
 ## Validate
 
@@ -62,7 +62,7 @@ Use Node.js 22.13 or newer (`nvm use` selects Node 22). The development toolchai
 
 
 - `GameEntry.tsx`: two-mode launcher, lazy-loaded games and dev routes.
-- `App.tsx` / `engine.ts`: shared court rendering; fixed 120 Hz game simulation, to-11 rules, assisted AI and arcade spin. Earlier Rapier components are reference code, not the active game.
+- `App.tsx` / `engine.ts`: shared court rendering; fixed 120 Hz game simulation, to-11 rules, assisted AI and arcade spin. The unused Rapier experiment and its stale TODOs/dependencies have been removed; Git history retains the original work.
 - `WebcamGame.tsx`, `useWebcamBody.ts`, pose/hand workers: phone/webcam orchestration, local camera inference and free-hand toss.
 - `sessionMarker.ts`, `useSessionMarker.ts`, `marker.worker.ts`: session match, face/top-up geometry checks and stable optical verification. Scanning stops once synchronized.
 - `usePhoneController.ts`, `phoneMotion.ts`, `controller/phone.html`: phone protocol, buffered motion and adaptive phone UI.
@@ -84,7 +84,7 @@ Open **Paddle setup** from either mode before starting. Choose a red, blue, gree
 
 **Escape or P** pauses mouse play and releases pointer lock. Navigation floats above the pause overlay, and opening setup/developer menus pauses play. Release version and build revision appear on the launcher and game headers, with a link to release notes.
 
-The remaining work is tracked in the [Table Tennis Prototype project](https://github.com/users/joncady/projects/3): physical motion/optical alignment/toss tuning, real Android/iPhone network and feedback trials, sponge/physics validation, multiplayer hardening, dev-tool upgrades and long-recording/legacy cleanup.
+The remaining work is tracked in the [Table Tennis Prototype project](https://github.com/users/joncady/projects/3): physical motion/optical alignment/toss tuning, real Android/iPhone network and feedback trials, sponge/physics validation, multiplayer hardening. Tooling and durable recording/legacy cleanup were completed in #8 and #9.
 
 ## Original 3D assets and credits
 
