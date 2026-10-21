@@ -32,5 +32,16 @@
     "wifi": 35,
     "congested": 403
   },
-  "limits": "Single local baseline, not an FPS guarantee or physical accuracy validation. Generated pixel deformation is not biomechanically realistic. Virtual player lost both matches."
+  "limits": "Single local baseline, not an FPS guarantee or physical accuracy validation. Generated pixel deformation is not biomechanically realistic. Virtual player lost both matches.",
+  "linuxSmoke": {
+    "run": "https://github.com/joncady/R3F-Table-Tennis/actions/runs/39635307318",
+    "passed": 10,
+    "phoneWebcamStartupMs": 5203,
+    "congestedPhoneStartupMs": 4967,
+    "observedCommandFeedbackMs": {
+      "wifi": 57,
+      "congested": 398
+    },
+    "stalledTransportMaxQueued": 91
+  }
 }
