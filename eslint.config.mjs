@@ -6,6 +6,7 @@ import refresh from 'eslint-plugin-react-refresh';
 
 export default [
   { ignores: ['dist/**', 'node_modules/**'] },
+  { files:['lab/**/*.mjs','playwright.config.mjs'],languageOptions:{globals:{...globals.browser,...globals.node,...globals.es2020}},rules:js.configs.recommended.rules },
   {
     files: ['src/**/*.{ts,tsx}', 'vite.config.ts'],
     languageOptions: { parser: tseslint.parser, globals: { ...globals.browser, ...globals.es2020, ...globals.node } },

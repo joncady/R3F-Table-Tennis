@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "lint": "eslint src vite.config.ts --report-unused-disable-directives --max-warnings 0",
+    "lint": "eslint src lab vite.config.ts playwright.config.mjs --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
     "test": "node tests/engine.test.mjs && node tests/equipment.test.mjs && node tests/swing.test.mjs && node tests/phone-motion.test.mjs && node tests/practice-player.test.mjs && node tests/simulated-swings.test.mjs && node tests/phone-platform.test.mjs && npm run test:net && npm run test:touch && npm run test:multiplayer",
     "controller": "node controller/server.mjs",

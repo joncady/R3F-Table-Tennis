@@ -8,7 +8,7 @@ import { Court } from "./App";
 import { Match, PlayerInput } from "./engine";
 import usePhoneController from "./usePhoneController";
 import useWebcamBody from "./useWebcamBody";
-import { PlayGate } from "./onboarding";
+import { PlayGate, TossIntent } from "./onboarding";
 import "./webcamGame.css";
 import { recordOrientationTrial } from "./orientationTrial";
 import useSessionMarker from "./useSessionMarker";
@@ -60,9 +60,12 @@ export default function WebcamGame() {
     [lateralFollow, setLateralFollow] = useState(1.5),
     [cameraStrength, setCameraStrength] = useState(0.45);
   const update = () => render((n) => n + 1);
+  const tossIntent=useRef(new TossIntent()),tossOwner=useRef<{match:Match;score:string}>(),tryToss=useRef(()=>{});
+
   const phone = usePhoneController(
     (command) => {
       if (command === "alignment-start") {
+        tossIntent.current.cancel();
         setPaused(true);
         autoPending.current = true;
         gate.current.reset();
@@ -77,25 +80,20 @@ export default function WebcamGame() {
         return;
       }
       if (command === "pause") {
+        tossIntent.current.cancel();
         if (paused) play();
         else setPaused(true);
         return;
       }
       if (command === "toss") {
-        if (!ready()) return;
-        const held = webcam.control.current.hand;
-        if (!held || performance.now() - held.at > 250) {
-          setNotice("Show your throwing hand before tossing.");
-          return;
-        }
-        match.heldHand = { x: held.x, y: held.y, z: 3.05 };
-        if (paused) play();
-        if (match.phase === "ready") match.start();
-        match.serve();
-        update();
+        if (!ready() || (match.phase!=="ready"&&(match.phase!=="serve"||match.server!==0))) return;
+        tossOwner.current={match,score:match.score.join(":")};
+        tossIntent.current.request(performance.now());tryToss.current();
+        if(tossIntent.current.pending)setNotice("Waiting for your throwing hand…");
         return;
       }
       if (command === "disconnected" || command === "suspend") {
+        tossIntent.current.cancel();
         setPaused(true);
         return;
       }
@@ -108,6 +106,16 @@ export default function WebcamGame() {
     undefined,
     true,
   );
+  tryToss.current=()=>{
+    if(!tossIntent.current.pending)return;
+    const now=performance.now(),held=webcam.control.current.hand;
+    const allowed=tossOwner.current?.match===match&&tossOwner.current.score===match.score.join(":")&&phone.connected&&phone.aligned&&webcam.mode==="camera"&&webcam.safe&&webcam.control.current.safe&&(match.phase==="ready"||(match.phase==="serve"&&match.server===0));
+    if(tossIntent.current.take(now,allowed,held?.at)&&held){
+      match.heldHand={x:held.x,y:held.y,z:3.05};if(paused)play();if(match.phase==="ready")match.start();match.serve();setNotice("");update();
+    }else if(!tossIntent.current.pending)setNotice(allowed?"Show your throwing hand, then tap Toss.":"");
+  };
+  useEffect(()=>{const timer=setInterval(()=>tryToss.current(),50);return()=>clearInterval(timer);},[]);
+  useEffect(()=>{if(paused){tossIntent.current.cancel();setNotice(current=>current==="Waiting for your throwing hand…"?"":current);}},[paused]);
   webcam.handedness.current = hand;
   webcam.tossEnabled.current =
     phone.aligned && !paused && match.phase === "serve" && match.server === 0;
@@ -258,11 +266,12 @@ export default function WebcamGame() {
               : match.phase === "over"
                 ? "Match finished — tap Play for another game."
                 : "Playing — swing to return.";
+  const controllerMessage=phone.connected&&phone.aligned&&webcam.mode==="camera"&&webcam.safe?notice||message:message;
   const reportRef = useRef(phone.reportStatus);
   reportRef.current = phone.reportStatus;
   useEffect(() => {
-    reportRef.current(message);
-  }, [message, phone.connected]);
+    reportRef.current(controllerMessage);
+  }, [controllerMessage, phone.connected]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (

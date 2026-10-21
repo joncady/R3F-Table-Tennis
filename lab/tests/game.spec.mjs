@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from '../fixtures.mjs';
 import {mousePlayer,startMouse} from '../player.mjs';
 test('mouse player serves, scores, pauses and resumes through normal controls',async({page},info)=>{
  const errors=[];page.on('pageerror',e=>errors.push(e.message));

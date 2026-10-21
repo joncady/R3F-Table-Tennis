@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from '../fixtures.mjs';
 test('generated camera: actual pose model tracks translation, loss and reacquisition',async({page},info)=>{
  await page.goto('lab/');await page.getByRole('button',{name:'Start real vision'}).click();
  await expect.poll(()=>page.evaluate(()=>window.labVision?.points),{timeout:60000}).toBe(33);

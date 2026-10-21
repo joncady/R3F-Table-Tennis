@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from '../fixtures.mjs';
 import {WebSocket} from 'ws';
 import {impairedRelay} from '../network.mjs';
 const wait=(socket,predicate,timeout=15000)=>new Promise((resolve,reject)=>{const timer=setTimeout(()=>{socket.off('message',read);reject(Error('Relay message timed out'));},timeout);function read(raw){const m=JSON.parse(raw);if(predicate(m)){clearTimeout(timer);socket.off('message',read);resolve(m);}}socket.on('message',read);});

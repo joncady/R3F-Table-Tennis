@@ -1,4 +1,4 @@
-import {test,expect} from '@playwright/test';
+import {test,expect} from '../fixtures.mjs';
 test.use({hasTouch:true,isMobile:true,viewport:{width:844,height:390}});
 for(const hand of ['left','right'])test(`touch ${hand} hand: independent move/swing, tap serve and cancellation`,async({page,context})=>{
  await page.goto('?mouse&virtual-player');await page.getByRole('button',{name:hand==='left'?'Left handed':'Right handed',exact:true}).click();await page.getByRole('button',{name:'Start game',exact:true}).last().click();await page.locator('.touch-wheel').waitFor();
