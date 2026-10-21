@@ -110,7 +110,6 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
   <PerspectiveCamera makeDefault position={[0, 2.75, 4.85]} rotation={[-.30, 0, 0]} fov={70} />
   <ambientLight intensity={1.4} /><directionalLight position={[3, 8, 4]} intensity={2} />
   <Model url="./models/table_tennis_table.glb" size={[3.05, 1.85, 5.48]} position={[0, .855, 0]} />
-  <mesh position={[0, 1.73, 0]}><boxGeometry args={[3.35, .3, .035]} /><meshStandardMaterial color="#c2d9dc" wireframe /></mesh>
   <mesh ref={ball} visible={!bodyControl}><sphereGeometry args={[.08, 20, 20]} /><meshStandardMaterial color="#fff6d5" emissive="#8b6928" emissiveIntensity={.25} /><mesh><sphereGeometry args={[.081, 16, 8, 0, .18]} /><meshBasicMaterial color="#dc6b36" side={2} /></mesh></mesh>
   <group ref={human}><Model equipment={paddleEquipment} url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
   <group ref={ai}><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>

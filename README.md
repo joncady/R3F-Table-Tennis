@@ -74,3 +74,16 @@ Open **Paddle setup** from either mode before starting. Choose a red, blue, gree
 **Escape or P** pauses mouse play and releases pointer lock. Navigation floats above the pause overlay, and opening setup/developer menus pauses play. Release version and build revision appear on the launcher and game headers, with a link to release notes.
 
 The remaining work is tracked in the [Table Tennis Prototype project](https://github.com/users/joncady/projects/3): physical motion/optical alignment/toss tuning, real Android/iPhone network and feedback trials, sponge/physics validation, multiplayer hardening, dev-tool upgrades and long-recording/legacy cleanup.
+
+## Original 3D assets and credits
+
+The original model links, authors and license identifiers are preserved in each GLB’s embedded `asset.extras` metadata.
+
+| Asset used in this game | Original model | Creator | License |
+| --- | --- | --- | --- |
+| `public/models/ping_pong_paddle.glb` | [Raqueta de ping pong](https://sketchfab.com/3d-models/raqueta-de-ping-pong-2531d5a1d03f46e0a0dbc5d9fd1e416f) | [GIYWBY](https://sketchfab.com/GIYWBY) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+| `public/models/table_tennis_table.glb` | [Table Tennis Table](https://sketchfab.com/3d-models/table-tennis-table-457c34c9297d44a1a5d4e5d093c6a712) | [Diccbudd](https://sketchfab.com/Diccbudd) | [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
+
+Game adaptations: models are centered, scaled and positioned at runtime; the paddle filename was renamed, and the player’s rubber materials can be recolored with matte presets. Credit for the original models belongs to the creators listed above.
+
+Found a bug? [Open a repository issue](https://github.com/joncady/R3F-Table-Tennis/issues/new), including the displayed version/build, browser/device and steps to reproduce.

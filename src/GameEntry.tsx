@@ -50,6 +50,7 @@ export default function GameEntry() {
         </button>
       </div>
       <p>F fullscreen · Escape to pause</p>
+      <nav className="community-links" aria-label="Project links"><a href="https://github.com/joncady/R3F-Table-Tennis" target="_blank" rel="noreferrer">View on GitHub</a><p>Found a bug? Please <a href="https://github.com/joncady/R3F-Table-Tennis/issues/new" target="_blank" rel="noreferrer">file an issue</a> with your version, device and steps to reproduce.</p></nav>
       <ReleaseBadge />
     </main>
   );
