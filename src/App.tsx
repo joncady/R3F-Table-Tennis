@@ -1,3 +1,5 @@
+import Ball from './Ball';
+import FullscreenButton from './FullscreenButton';
 import TouchControls from './TouchControls';
 import { usesTouchControls } from './touchDevice';
 import EquipmentPanel from './EquipmentPanel';
@@ -102,7 +104,7 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
   if (!networkFrame && human.current && phoneActive) human.current.quaternion.copy(phoneRotation.current);
   else if (!networkFrame && human.current) {
    const desired = match.backhand ? Math.PI : 0;
-   human.current.rotation.y += (desired - human.current.rotation.y) * (1 - Math.exp(-delta * 16));
+   human.current.rotation.y = desired;
    human.current.rotation.z = (match.handedness === 'right' ? -.14 : .14) - input.current.x * .16;
   }
   const key = `${match.phase}:${match.score}:${match.message}:${match.backhand}`;
@@ -112,9 +114,9 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
   <PerspectiveCamera makeDefault position={[0, 2.75, 4.85]} rotation={[-.30, 0, 0]} fov={70} />
   <ambientLight intensity={1.4} /><directionalLight position={[3, 8, 4]} intensity={2} />
   <Model url="./models/table_tennis_table.glb" size={[3.05, 1.85, 5.48]} position={[0, .855, 0]} />
-  <mesh ref={ball} visible={!bodyControl}><sphereGeometry args={[.08, 20, 20]} /><meshStandardMaterial color="#fff6d5" emissive="#8b6928" emissiveIntensity={.25} /><mesh><sphereGeometry args={[.081, 16, 8, 0, .18]} /><meshBasicMaterial color="#dc6b36" side={2} /></mesh></mesh>
-  <group ref={human}><Model equipment={paddleEquipment} url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
-  <group ref={ai}><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
+  <Ball ref={ball} visible={!bodyControl}/>
+  <group ref={human} name="player-paddle"><Model equipment={paddleEquipment} url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
+  <group ref={ai} name="opponent-paddle"><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
   <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -.05, 0]}><planeGeometry args={[200, 200]} /><meshStandardMaterial color="#102a34" /></mesh>
  </>;
 }
@@ -281,7 +283,7 @@ export default function App({webcam,mouseOnly=false}:{webcam?:WebcamBodyControll
   {webcam&&<WebcamPanel webcam={webcam} pause={pauseGame} startTest={startTossTest}/>}
   {showPairing && <div className="overlay pairing"><article><small>PHONE CONTROLLER</small><h1>{phone.connected ? 'Your phone is connected.' : 'Pair your paddle.'}</h1><p>{phone.status}</p>{mouseError&&<p role="alert">{mouseError}</p>}<button onClick={phone.pair}>{phone.pairing ? 'Create new pairing' : 'Create pairing'}</button>{phone.pairing && <><img width="180" height="180" src={phone.pairing.qr} alt="Phone controller pairing QR code" />{phone.pairing.certificateUrl?<p>Local Wi-Fi pairing. Android users can install the local CA from <a href={phone.pairing.certificateUrl}>{phone.pairing.certificateUrl}</a> under Settings → Security → Install certificate → CA certificate. This trusts only this prototype’s locally generated CA; remove it when finished. For iPhone, use the public HTTPS game for the simplest setup; local certificates require installation and explicit full trust in iOS Settings.</p>:<p>Scan the QR on iPhone or Android, tap Connect, and calibrate. iPhone will ask for Motion & Orientation permission. No local certificate or shared Wi-Fi is needed. The phone shows round-trip latency through this game.</p>}<p>Then scan the QR or open <a href={phone.pairing.phoneUrl}>{phone.pairing.phoneUrl}</a>, tap Connect, and calibrate.</p></>}<button disabled={!phone.connected} onClick={() => { input.current.x=0; input.current.y=0; resumePhone(); }}>{match.phase === 'ready' ? 'Start with phone' : 'Continue with phone'}</button><button onClick={() => { setPhoneActive(false); setShowPairing(false); }}>Use mouse</button></article></div>}
 
-  <header className="game-navigation"><div className="brand">TABLE / TENNIS<ReleaseBadge/><small>{webcam?'Webcam body · local singles':'First-person singles'}</small></div><div className="score"><span className={match.server === 0 ? 'server' : ''}>YOU <b>{match.score[0]}</b></span><i>:</i><span className={match.server === 1 ? 'server' : ''}><b>{match.score[1]}</b> AI</span></div><div className="view-controls"><button onClick={()=>{location.href=import.meta.env.BASE_URL;}}>Modes</button><button onClick={()=>{pauseGame();setEquipmentOpen(v=>!v);setDev(false);}}>Paddle setup</button><button onClick={()=>{pauseGame();setDev(v=>!v);setEquipmentOpen(false);}}>Developer tools</button>{!mouseOnly&&<button onClick={() => { pauseGame(); setShowPairing(true); }}>{phone.connected ? 'Edit phone pairing' : phone.pairing ? 'Reconnect phone' : 'Pair phone'}</button>}<button onClick={() => { if (paused || match.phase==='ready') startGame(); else pauseGame(); }}>{match.phase==='ready'?'Start game':paused ? 'Resume' : 'Pause'}</button></div></header>
+  <header className="game-navigation"><div className="brand">TABLE / TENNIS<ReleaseBadge/><small>{webcam?'Webcam body · local singles':'First-person singles'}</small></div><div className="score"><span className={match.server === 0 ? 'server' : ''}>YOU <b>{match.score[0]}</b></span><i>:</i><span className={match.server === 1 ? 'server' : ''}><b>{match.score[1]}</b> AI</span></div><div className="view-controls"><FullscreenButton target={surface}/><button onClick={()=>{location.href=import.meta.env.BASE_URL;}}>Modes</button><button onClick={()=>{pauseGame();setEquipmentOpen(v=>!v);setDev(false);}}>Paddle setup</button><button onClick={()=>{pauseGame();setDev(v=>!v);setEquipmentOpen(false);}}>Developer tools</button>{!mouseOnly&&<button onClick={() => { pauseGame(); setShowPairing(true); }}>{phone.connected ? 'Edit phone pairing' : phone.pairing ? 'Reconnect phone' : 'Pair phone'}</button>}<button onClick={() => { if (paused || match.phase==='ready') startGame(); else pauseGame(); }}>{match.phase==='ready'?'Start game':paused ? 'Resume' : 'Pause'}</button></div></header>
   {equipmentOpen&&<EquipmentPanel equipment={equipment} change={setEquipment} restart={()=>{const next=new Match(hand);activeMatch.current=next;setMatch(next);setPaused(true);}} close={()=>setEquipmentOpen(false)} locked={match.phase!=='ready'&&match.phase!=='over'}/>}
   {dev&&<aside className="mouse-dev"><h2>Developer tools</h2>{Object.entries(diagnostics).map(([key,value])=><p key={key}>{key}: {value}</p>)}<a href="?multiplayer">Multiplayer prototype</a></aside>}
   <Canvas frameloop={paused ? 'never' : 'always'}><color attach="background" args={['#102a34']} /><Suspense fallback={null}><Court steadyInput={touchMode} paddleEquipment={equipment} frameCount={frameCount} bodyControl={useBody||webcam?.quickMode?webcam?.control:undefined} match={match} input={input} update={update} cameraStrength={cameraStrength} phoneActive={phoneActive} phonePose={phone.pose} samplePhonePose={phone.samplePose} phoneSensitivity={phoneSensitivity} lateralFollow={lateralFollow} impact={phone.impact} /></Suspense></Canvas>

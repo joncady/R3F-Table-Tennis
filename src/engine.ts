@@ -44,6 +44,27 @@ export function localPoint(x: number, y: number, z: number, q: Rotation) {
  const tx = 2 * (qy * z - qz * y), ty = 2 * (qz * x - qx * z), tz = 2 * (qx * y - qy * x);
  return {x:x + qw * tx + qy * tz - qz * ty, y:y + qw * ty + qz * tx - qx * tz, z:z + qw * tz + qx * ty - qy * tx};
 }
+// Bounds include the full displayed blade and handle, rotated about the same
+// origin as the collision face. Separate from the tabletop by the shortest axis.
+export function clearPaddleTable(p:{x:number;y:number;z:number},rotation:Rotation=[0,0,0,1],animatedMouse=false) {
+ const inverse:Rotation=[-rotation[0],-rotation[1],-rotation[2],rotation[3]];
+ const low={x:Infinity,y:Infinity,z:Infinity},high={x:-Infinity,y:-Infinity,z:-Infinity};
+ for(const x of [-.375,.375])for(const y of [-.68,.32])for(const z of [-.06,.06]){
+  const v=localPoint(x,y,z,inverse);
+  for(const axis of ['x','y','z'] as const){low[axis]=Math.min(low[axis],v[axis]);high[axis]=Math.max(high[axis],v[axis]);}
+ }
+ // Mouse rendering has up to .3 rad of roll on either paddle face.
+ // The envelope protects the full blade and handle at either face heading.
+ if(animatedMouse){Object.assign(low,{x:-.57,y:-.77,z:-.06});Object.assign(high,{x:.57,y:.44,z:.06});}
+ const min={x:-1.58,y:1.36,z:-2.78},max={x:1.58,y:1.52,z:2.78},gap=.015;
+ const axes=['x','y','z'] as const;
+ if(axes.some(axis=>p[axis]+high[axis]<=min[axis]-gap||p[axis]+low[axis]>=max[axis]+gap))return;
+ let correction:{axis:'x'|'y'|'z';amount:number}|undefined;
+ for(const axis of axes)for(const amount of [min[axis]-gap-p[axis]-high[axis],max[axis]+gap-p[axis]-low[axis]]){
+  if(!correction||Math.abs(amount)<Math.abs(correction.amount))correction={axis,amount};
+ }
+ if(correction)p[correction.axis]+=correction.amount;
+}
 export function blendRotation(a: Rotation, b: Rotation, t: number): Rotation {
  const sign = a.reduce((sum, n, i) => sum + n * b[i], 0) < 0 ? -1 : 1;
  const q = a.map((n, i) => n + (sign * b[i] - n) * t);
@@ -164,13 +185,15 @@ export class Match {
  if (relative < -.12) this.backhand = true;
  else if (relative > .12) this.backhand = false;
  player.y = move(player.y, 1.9 + (input.phone && input.swingOffset ? clamp(input.swingOffset[1], -1, 1.3) : clamp(input.y, -1, 1) * .8), input.phone ? 18 : 10);
+ // Estimate stroke reach before resolving the full paddle against the tabletop.
+ const strokeSpeed=Math.hypot(player.x-oldPaddles[0].x,player.y-oldPaddles[0].y)/dt;
+ player.z = move(player.z, this.body.z - 1 + (input.phone && input.swingOffset ? clamp(input.swingOffset[2], -.6, .45) : -Math.min(.32, strokeSpeed * .035)), input.phone ? 12 : 4);
+ clearPaddleTable(player,this.paddleRotation,!input.phone);
  player.vx = (player.x - oldPaddles[0].x) / dt;
  player.vy = (player.y - oldPaddles[0].y) / dt;
  const brushAlpha = 1 - Math.exp(-dt * 24);
  this.brush.x += (player.vx - (this.body.x - oldBodyX) / dt - this.brush.x) * brushAlpha;
  this.brush.y += (player.vy - this.brush.y) * brushAlpha;
- // Mouse strokes sweep the paddle forward, then it returns to its resting reach.
- player.z = move(player.z, this.body.z - 1 + (input.phone && input.swingOffset ? clamp(input.swingOffset[2], -.6, .45) : -Math.min(.32, Math.hypot(player.vx, player.vy) * .035)), input.phone ? 12 : 4);
  player.vz = (player.z - oldPaddles[0].z) / dt;
  }
  step(dt: number, input: PlayerInput, secondInput?:PlayerInput) {
@@ -232,7 +255,7 @@ export class Match {
    if(time>0&&this.aiShot!==this.impactSequence){this.aiShot=this.impactSequence;this.aiError={x:(this.random()+this.random()+this.random()-1.5)*.45,y:(this.random()+this.random()-1)*.16};}
    this.aiTarget = time > 0 ? { x: Math.max(-1.7, Math.min(1.7, predicted.x + this.aiError.x)), y: Math.max(.9, Math.min(3, predicted.y + this.aiError.y)) } : { x: 0, y: 1.9 };
   }
-  const ai = this.paddles[1]; ai.x = move(ai.x, this.aiTarget.x, 2.6); ai.y = move(ai.y, this.aiTarget.y, 2.8);
+  const ai = this.paddles[1]; ai.x = move(ai.x, this.aiTarget.x, 2.6); ai.y = move(ai.y, this.aiTarget.y, 2.8);clearPaddleTable(ai);
   }
   flyBall(b, dt);
   // Swept plane crossings prevent fast balls skipping thin surfaces.

@@ -4,7 +4,7 @@ import assert from 'node:assert/strict';
 const code = ts.transpileModule(fs.readFileSync(new URL('../src/engine.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.ES2020 } }).outputText;
 let seed = 12345;
 Math.random = () => { seed = (seed * 16807) % 2147483647; return (seed - 1) / 2147483646; };
-const { Match, serverFor, winnerFor, flyBall, bounceBall, followSwing, SPIN, localPoint, blendRotation } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
+const { Match, serverFor, winnerFor, flyBall, bounceBall, followSwing, SPIN, localPoint, blendRotation, clearPaddleTable } = await import('data:text/javascript;base64,' + Buffer.from(code).toString('base64'));
 const neutral = {x:0,y:0};
 assert.equal(winnerFor([11,9]),0); assert.equal(winnerFor([11,10]),null); assert.equal(winnerFor([12,14]),1);
 assert.deepEqual([[0,0],[1,0],[2,0],[10,10],[11,10],[11,11]].map(serverFor),[0,0,1,0,1,0]);
@@ -128,10 +128,21 @@ const accelerationHand=new Match();accelerationHand.start();
 for(let i=0;i<60;i++)accelerationHand.step(1/120,{x:0,y:0,phone:true,orientation:turn,swingOffset:[.3,.2,-.25]});
 assert.ok(Math.abs(accelerationHand.paddles[0].x-.85)<1e-9);
 assert.ok(Math.abs(accelerationHand.paddles[0].y-2.1)<1e-9);
-assert.ok(Math.abs(accelerationHand.paddles[0].z-2.8)<1e-9);
+assert.ok(accelerationHand.paddles[0].z>=2.8 && accelerationHand.paddles[0].z<=3.18,'Forward acceleration is bounded by the rotated blade clearance at the table edge');
 assert.deepEqual(accelerationHand.paddleRotation,turn,'Linear swing must not change 1:1 orientation');
 assert.equal(accelerationHand.body.x,0);assert.equal(accelerationHand.body.z,4.05);
 console.log('Passed: acceleration offsets control all hand axes independently of face orientation and player body.');
 
 const longRally=new Match();longRally.phase='rally';longRally.timer=20.1;Object.assign(longRally.ball,{x:0,y:5,z:-1,vz:-1,vy:0});longRally.step(1/120,neutral);assert.equal(longRally.phase,'rally','A live rally must not award an arbitrary timeout point');
 console.log('Passed: rallies longer than 20 seconds continue until a real fault.');
+
+// Independent transformed-corner bounds verify table separation across poses.
+for(let i=0;i<300;i++){
+ const angle=i*.173,axis=[Math.sin(i*.7),Math.cos(i*.3),Math.sin(i*.2)],length=Math.hypot(...axis),q=[...axis.map(n=>n/length*Math.sin(angle/2)),Math.cos(angle/2)];
+ const p={x:Math.sin(i)*2,y:.7+(i%30)*.08,z:Math.cos(i*.6)*3.5};clearPaddleTable(p,q);
+ const bounds=[[],[],[]];for(const x of [-.375,.375])for(const y of [-.68,.32])for(const z of [-.06,.06]){const v=localPoint(x,y,z,[-q[0],-q[1],-q[2],q[3]]);bounds[0].push(p.x+v.x);bounds[1].push(p.y+v.y);bounds[2].push(p.z+v.z);}
+ const min=[-1.58,1.36,-2.78],max=[1.58,1.52,2.78];assert.ok(bounds.some((a,j)=>Math.max(...a)<=min[j]-.0149||Math.min(...a)>=max[j]+.0149),'Rotated blade and handle must clear the tabletop');
+ const resolved={...p};clearPaddleTable(p,q);assert.deepEqual(p,resolved,'Resting clearance is stable');
+}
+const clear={x:0,y:3,z:0};clearPaddleTable(clear);assert.deepEqual(clear,{x:0,y:3,z:0},'Unobstructed paddle remains unchanged');
+console.log('Passed: 300 rotated blade/handle poses separate from the tabletop with stable clearance.');

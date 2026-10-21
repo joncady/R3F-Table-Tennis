@@ -1,3 +1,4 @@
+import FullscreenButton from './FullscreenButton';
 import TouchControls from './TouchControls';
 import {usesTouchControls} from './touchDevice';
 import {Suspense,useEffect,useRef,useState} from 'react';
@@ -100,7 +101,7 @@ export default function Multiplayer(){
  return <main ref={surface} className={touchMode?'touch-game':undefined}>
   <Canvas><color attach="background" args={['#102a34']}/><Suspense fallback={null}><Court steadyInput={touchMode} match={match} input={input} update={()=>{}} cameraStrength={.65} phoneActive={false} phonePose={noPose} phoneSensitivity={2} lateralFollow={1.5} impact={()=>{}} networkFrame={applySnapshot}/></Suspense></Canvas>
   {touchMode&&mode==='mouse'&&connected&&snapshot&&!snapshot.paused&&snapshot.phase!=='over'&&<TouchControls input={input} hand={snapshot.players[side.current].handedness} serve={()=>send({type:'toss'})}/>}
-  <header><div className="brand">TABLE / TENNIS<small>Private multiplayer</small></div><div className="score">YOU <b>{snapshot?.score[side.current]??0}</b> : <b>{snapshot?.score[side.current===0?1:0]??0}</b> OPPONENT</div><div className="view-controls"><button onClick={()=>send({type:'pause'})}>Pause / ready</button><button onClick={()=>{send({type:'leave'});socket.current?.close();location.href=base();}}>Leave match</button></div></header>
+  <header><div className="brand">TABLE / TENNIS<small>Private multiplayer</small></div><div className="score">YOU <b>{snapshot?.score[side.current]??0}</b> : <b>{snapshot?.score[side.current===0?1:0]??0}</b> OPPONENT</div><div className="view-controls"><FullscreenButton target={surface}/><button onClick={()=>send({type:'pause'})}>Pause / ready</button><button onClick={()=>{send({type:'leave'});socket.current?.close();location.href=base();}}>Leave match</button></div></header>
   <section className="status"><h2>{match.message}</h2><p>{touchMode?'Movement wheel to move · Drag to swing · Tap to toss':'A/D move · W/S step · Mouse swing · Space toss · F fullscreen · Esc pause'}</p></section>
   {(!connected||snapshot?.paused||snapshot?.phase==='over')&&<div className="overlay pairing"><article><small>PRIVATE MULTIPLAYER</small><h1>{snapshot?.phase==='over'?match.message:identity?'Your match room.':'Play together.'}</h1><p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
    {ended&&<button onClick={()=>{location.href='?multiplayer';}}>Create another match</button>}
