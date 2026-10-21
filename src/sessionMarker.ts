@@ -5,7 +5,7 @@ export function markerFacingCamera(location: {
   topRightCorner: { x: number; y: number };
   bottomLeftCorner: { x: number; y: number };
   bottomRightCorner: { x: number; y: number };
-}) {
+}, minSize = 45) {
   const {
     topLeftCorner: a,
     topRightCorner: b,
@@ -20,8 +20,8 @@ export function markerFacingCamera(location: {
     width = (top + bottom) / 2,
     height = (left + right) / 2;
   return (
-    width >= 45 &&
-    height >= 45 &&
+    width >= minSize &&
+    height >= minSize &&
     width / height > 0.78 &&
     width / height < 1.28 &&
     Math.min(top, bottom) / Math.max(top, bottom) > 0.75 &&
@@ -56,6 +56,7 @@ export function markerGuidance(
   seen: string | null,
   location: Parameters<typeof markerFacingCamera>[0] | null,
   sinceMatch: number,
+  minSize = 45,
 ) {
   if (seen && seen !== expected) return 'Different session marker. Reopen this game’s pairing link.';
   if (seen === expected && location) {
@@ -63,8 +64,8 @@ export function markerGuidance(
       Math.hypot(location.topRightCorner.x - location.topLeftCorner.x, location.topRightCorner.y - location.topLeftCorner.y),
       Math.hypot(location.bottomLeftCorner.x - location.topLeftCorner.x, location.bottomLeftCorner.y - location.topLeftCorner.y),
     );
-    if (size < 45) return 'Marker is too small. Move the phone closer to the webcam.';
-    if (!markerFacingCamera(location)) return 'Marker found. Face the screen straight at webcam, top edge up.';
+    if (size < minSize) return 'Marker is too small. Move the phone closer to the webcam.';
+    if (!markerFacingCamera(location, minSize)) return 'Marker found. Face the screen straight at webcam, top edge up.';
     return 'Matching session. Hold steady…';
   }
   if (sinceMatch <= 1800) return 'Marker briefly lost. Keep it facing the webcam; alignment is still in progress.';

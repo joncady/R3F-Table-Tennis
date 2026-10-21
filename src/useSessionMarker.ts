@@ -30,9 +30,11 @@ export default function useSessionMarker(
         return;
       }
       const now = performance.now();
-      const facing = data.location && markerFacingCamera(data.location);
+      // Preserve the former 1280px size threshold without upscaling pixels.
+      const minSize = 45 * (data.width || 1280) / 1280;
+      const facing = data.location && markerFacingCamera(data.location, minSize);
       if (data.data === expected && facing) lastMatch = now;
-      setStatus(markerGuidance(expected, data.data, data.location, now - lastMatch));
+      setStatus(markerGuidance(expected, data.data, data.location, now - lastMatch, minSize));
       if (gate.update(performance.now(), expected, data.data, !!facing)) {
         matched = true;
         setStatus('Marker verified. Synchronizing phone…');

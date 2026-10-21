@@ -16,6 +16,7 @@ scope.onmessage = ({ data }) => {
         inversionAttempts: 'dontInvert',
       });
     scope.postMessage({
+      width: bitmap.width,
       data: code?.data || null,
       location: code?.location || null,
     });

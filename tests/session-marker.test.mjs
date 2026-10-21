@@ -40,3 +40,6 @@ const points=[];points[11]={x:.01,y:.3,visibility:1};points[12]={x:.3,y:.3,visib
 assert.match(bodyGuidance(points,0),/camera edge/);
 points[11].x=.45;points[12].x=.49;assert.match(bodyGuidance(points,0),/closer/);
 points[12].x=.65;assert.match(bodyGuidance(points,0),/Shoulders visible/);
+
+assert.ok(markerFacingCamera(tiny,22.5),'native 640px camera keeps the same apparent-size requirement as 1280px scanning');
+assert.match(markerGuidance(expected,expected,tiny,0,22.5),/Matching session/);
