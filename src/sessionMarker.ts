@@ -33,14 +33,18 @@ export function markerFacingCamera(location: {
 export class MarkerGate {
   private since: number | null = null;
   private last = -Infinity;
+  private detections = 0;
   update(now: number, expected: string, seen: string | null, facing: boolean) {
-    if (seen !== expected || !facing) {
+    // Brief decode misses are normal on low-resolution webcams. Only valid
+    // observations refresh this window; a different/tilted marker resets it.
+    if (now - this.last > 1800 || (seen !== null && (seen !== expected || !facing))) {
       this.since = null;
-      this.last = now;
-      return false;
+      this.detections = 0;
     }
-    if (this.since === null || now - this.last > 500) this.since = now;
+    if (seen !== expected || !facing) return false;
+    if (this.since === null) this.since = now;
     this.last = now;
-    return now - this.since >= 500;
+    this.detections += 1;
+    return this.detections >= 3 && now - this.since >= 400;
   }
 }
