@@ -50,6 +50,12 @@ RELAY_HTTP=https://4jcmv1vcki.execute-api.us-west-2.amazonaws.com npm run test:c
 
 The tests cover scoring/deuce/service, passive and rotated paddle contacts, spin, synthetic motion, simulated complete AI/multiplayer matches, phone API doubles, marker encode/decode, session rejection, recording lifecycle and relay messages. Browser integration tests additionally exercise the real QR worker and WebSocket relay with synthetic camera/body/sensor inputs. These checks do not certify real device feel, optical accuracy, haptic hardware or adverse network conditions.
 
+## Net contacts and lets
+
+A service net touch is replayed only after an otherwise legal service reaches the receiver’s court (or the receiver obstructs it). A net hit that falls back or lands out loses the point; rally net cords remain playable. The same server retries a let without changing the score. See [Laws 2026–27, 2.9.1.1](https://www.tabletennisengland.co.uk/content/uploads/2026/07/Laws-of-Table-Tennis-2026-27.pdf) and the [PingSkills video at 2:09](https://www.youtube.com/watch?v=9ZoEMXyP9Lc&t=129s).
+
+The game distinguishes a round top cord from the mesh: glancing cord contacts can slow, deflect and carry over; low mesh contacts lose momentum and fall back. Contact drives a brief local net ripple, fixed at the posts. This is a bounded gameplay approximation; damping and restitution are tuning values, not measurements extracted from the reference video. Net contact events are replicated to multiplayer displays. Run `npm run test:net` for both-server let/fault and high-speed contact trials.
+
 ## Implementation and deployment
 
 - `GameEntry.tsx`: two-mode launcher, lazy-loaded games and dev routes.

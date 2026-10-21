@@ -40,7 +40,7 @@ const wait=ms=>new Promise(r=>setTimeout(r,ms));
 const rejected=new WebSocket(`${endpoint}?role=display&token=invalid`);const [closeCode]=await once(rejected,'close');assert.equal(closeCode,1008);
 const a=await connect('display','d0'),b=await connect('display','d1'),p=await connect('phone','p1');
 const send=(ws,m)=>ws.send(JSON.stringify(m));
-let snapshot,impact=false;a.on('message',v=>{const m=JSON.parse(v);if(m.type==='snapshot')snapshot=m;});p.on('message',v=>{if(JSON.parse(v).type==='impact')impact=true;});
+let snapshot,otherSnapshot,impact=false; b.on('message',v=>{const m=JSON.parse(v);if(m.type==='snapshot')otherSnapshot=m;});a.on('message',v=>{const m=JSON.parse(v);if(m.type==='snapshot')snapshot=m;});p.on('message',v=>{if(JSON.parse(v).type==='impact')impact=true;});
 const feed=setInterval(()=>{send(a,{type:'input',x:.4,y:.2});send(b,{type:'input',x:0,y:0});send(p,{type:'motion',seq:Date.now(),q:[0,0,0,1],swing:[.3,.1,0]});},16);
 await wait(50);send(a,{type:'ready'});send(b,{type:'ready'});await wait(120);
 assert.equal(game.snapshot().paused,false);assert.equal(game.seats[1].mode,'phone');assert.ok(game.match.paddles[0].x>0);assert.ok(game.match.paddles[1].x<-.55);
@@ -49,7 +49,11 @@ send(p,{type:'pause'});await wait(50);assert.equal(game.snapshot().paused,true);
 send(a,{type:'ready'});send(p,{type:'pause'});await wait(50);assert.equal(game.snapshot().paused,false);
 // Impact routing to the striking seat only; no phone can inject points or a ball.
 game.match.impacts[1]++;await wait(35);assert.ok(impact);const score=[...game.match.score];send(p,{type:'score',score:[11,0]});await wait(25);assert.deepEqual(game.match.score,score);
-assert.ok(snapshot.sequence>1);p.close();await wait(50);assert.equal(game.snapshot().paused,true);
+// Both displays receive the same authoritative net contact (renderers mirror it).
+const beforeNet=game.match.netMotion.sequence;
+Object.assign(game.match,{phase:'rally',last:0,server:0,bounces:1,serving:true});Object.assign(game.match.ball,{x:.2,y:1.88,z:.15,vx:0,vy:0,vz:-4,wx:0,wy:0,wz:0});
+await wait(120);assert.equal(game.match.netMotion.sequence,beforeNet+1);assert.equal(snapshot.netMotion.sequence,beforeNet+1);assert.equal(otherSnapshot.netMotion.sequence,beforeNet+1);assert.equal(snapshot.netMotion.x,otherSnapshot.netMotion.x);assert.equal(snapshot.netMotion.direction,otherSnapshot.netMotion.direction);
+assert.ok(snapshot.sequence>1);assert.equal(typeof snapshot.netMotion.sequence,'number');assert.equal(typeof snapshot.netMotion.age,'number');p.close();await wait(50);assert.equal(game.snapshot().paused,true);
 clearInterval(feed);
 for(const kind of ['ios','android']){
  const page=await phonePage({endpoint,room:room.id,token:'p1',kind});page.orientation({alpha:0,beta:0,gamma:0});await wait(40);page.orientation({alpha:0,beta:15,gamma:0});await wait(40);assert.ok(Math.abs(game.seats[1].input.orientation[0])>.05);

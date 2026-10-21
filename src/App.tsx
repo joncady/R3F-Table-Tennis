@@ -1,3 +1,4 @@
+import Net from './Net';
 import Ball from './Ball';
 import FullscreenButton from './FullscreenButton';
 import TouchControls from './TouchControls';
@@ -23,6 +24,7 @@ function Model({ url, size, position,equipment }: { equipment?:Equipment; url: s
   const box = new Box3().setFromObject(copy);
   const dimensions = box.getSize(new Vector3());
   copy.position.sub(box.getCenter(new Vector3()));
+  if(url.includes('table_tennis_table')){for(const name of ['Net_3','NetBorder_4']){const net=copy.getObjectByName(name);if(net)net.visible=false;}}
   const group = new Group();
   group.add(copy);
   group.scale.set(size[0] / dimensions.x, size[1] / dimensions.y, size[2] / dimensions.z);
@@ -113,7 +115,8 @@ export function Court({ match, input, update, cameraStrength, phoneActive, phone
  return <>
   <PerspectiveCamera makeDefault position={[0, 2.75, 4.85]} rotation={[-.30, 0, 0]} fov={70} />
   <ambientLight intensity={1.4} /><directionalLight position={[3, 8, 4]} intensity={2} />
-  <Model url="./models/table_tennis_table.glb" size={[3.05, 1.85, 5.48]} position={[0, .855, 0]} />
+  <Model url="./models/table_tennis_table.glb" size={[3.644, 1.85, 5.48]} position={[0, .877, 0]} />
+  <Net match={match}/>
   <Ball ref={ball} visible={!bodyControl}/>
   <group ref={human} name="player-paddle"><Model equipment={paddleEquipment} url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>
   <group ref={ai} name="opponent-paddle"><Model url="./models/ping_pong_paddle.glb" size={[.75, 1, .12]} position={[0, -.18, 0]} /></group>

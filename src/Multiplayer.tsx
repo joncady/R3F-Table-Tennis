@@ -7,7 +7,7 @@ import QRCode from 'qrcode';
 import {Court} from './App';
 import {Match,PlayerInput,Rotation} from './engine';
 
-type Snapshot={sequence:number;paused:boolean;started:boolean;phase:Match['phase'];score:number[];server:0|1;winner:0|1|null;ball:Match['ball'];paddles:Match['paddles'];players:{body:Match['body'];brush:Match['brush'];rotation:Rotation;handedness:'left'|'right';backhand:boolean}[];seats:{connected:boolean;phone:boolean;mode:string;ready:boolean}[]};
+type Snapshot={sequence:number;paused:boolean;started:boolean;phase:Match['phase'];score:number[];server:0|1;winner:0|1|null;ball:Match['ball'];netMotion?:Match['netMotion'];message?:string;paddles:Match['paddles'];players:{body:Match['body'];brush:Match['brush'];rotation:Rotation;handedness:'left'|'right';backhand:boolean}[];seats:{connected:boolean;phone:boolean;mode:string;ready:boolean}[]};
 const base=()=>`${location.origin}${location.pathname}`;
 const initial=new URLSearchParams(location.hash.slice(1));
 export default function Multiplayer(){
@@ -90,11 +90,12 @@ export default function Multiplayer(){
   const mix=(a:number,b:number)=>a+(b-a)*Math.min(1,(performance.now()-arrived.current)/(1000/30));
   const lerp=(object:object,old?:object)=>Object.fromEntries(Object.entries(object).map(([k,v])=>[k,old?mix((old as Record<string,number>)[k],v):v]));
   match.phase=s.phase;match.score=[s.score[side.current],s.score[other]];match.server=s.server===side.current?0:1;match.winner=s.winner===null?null:s.winner===side.current?0:1;
+  if(s.netMotion)match.netMotion={...s.netMotion,x:s.netMotion.x*sign,direction:s.netMotion.direction*sign,age:s.netMotion.age+(performance.now()-arrived.current)/1000};
   const b=lerp(s.ball,previous.current?.ball) as unknown as Match['ball'];b.x*=sign;b.z*=sign;b.vx*=sign;b.vz*=sign;b.wx*=sign;b.wz*=sign;match.ball=b;
   match.paddles=[side.current,other].map(i=>{const p=lerp(s.paddles[i],previous.current?.paddles[i]) as unknown as Match['paddles'][number];return {...p,x:p.x*sign,z:p.z*sign,vx:p.vx*sign,vz:p.vz*sign};});
   const player=s.players[side.current];match.body=player.body;match.brush=player.brush;match.handedness=player.handedness;match.backhand=player.backhand;match.paddleRotation=player.rotation;
   const q=s.players[other].rotation;match.far.rotation=[q[2],q[3],-q[0],-q[1]];
-  match.message=s.paused?'Both players must be ready to play':s.phase==='serve'?`${match.server===0?'Your':'Opponent’s'} serve${match.server===0?(touchMode?' · Tap to toss':' · Space / phone Toss'):''}`:s.phase==='over'?`${match.winner===0?'You win!':'Opponent wins.'}`:s.phase==='point'?'Point · next serve shortly':'Rally';
+  match.message=s.message?.startsWith('Net serve')?s.message:s.paused?'Both players must be ready to play':s.phase==='serve'?`${match.server===0?'Your':'Opponent’s'} serve${match.server===0?(touchMode?' · Tap to toss':' · Space / phone Toss'):''}`:s.phase==='over'?`${match.winner===0?'You win!':'Opponent wins.'}`:s.phase==='point'?'Point · next serve shortly':'Rally';
  };
  const ready=async()=>{setError('');try{if(mode==='mouse'&&!touchMode){if(!surface.current?.requestPointerLock)throw Error('Mouse capture is unavailable. Open this game in Chrome.');await surface.current.requestPointerLock();}send({type:'ready'});}catch(e){setError((e as Error).message||'Mouse capture was blocked. Click Ready again.');}};
  const mine=snapshot?.seats[side.current],opponent=snapshot?.seats[side.current===0?1:0];

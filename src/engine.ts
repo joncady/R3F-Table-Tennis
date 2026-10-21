@@ -20,6 +20,38 @@ export function flyBall(b: BallState, dt: number) {
  b.x += b.vx * dt; b.y += b.vy * dt; b.z += b.vz * dt;
  const decay = Math.exp(-SPIN.drag * dt); b.wx *= decay; b.wy *= decay; b.wz *= decay;
 }
+// Two-times court scale: 15.25 cm net above a 76 cm playing surface.
+export const NET={top:1.805,bottom:1.5,halfWidth:1.78,cordRadius:.012,ballRadius:.08};
+export interface NetMotion {sequence:number;x:number;strength:number;direction:number;age:number}
+export function collideNet(b:BallState,previous:{x:number;y:number;z:number},dt:number){
+ const dx=b.x-previous.x,dy=b.y-previous.y,dz=b.z-previous.z;
+ if(Math.abs(dz)<1e-10)return null;
+ let hit:{t:number;ny:number;nz:number;kind:'cord'|'mesh'}|undefined;
+ const radius=NET.ballRadius+NET.cordRadius,oy=previous.y-NET.top;
+ const a=dy*dy+dz*dz,bb=2*(oy*dy+previous.z*dz),c=oy*oy+previous.z*previous.z-radius*radius,disc=bb*bb-4*a*c;
+ if(a>1e-12&&disc>=0){
+  const t=(-bb-Math.sqrt(disc))/(2*a);
+  if(t>=0&&t<=1&&Math.abs(previous.x+dx*t)<=NET.halfWidth){
+   const ny=(oy+dy*t)/radius,nz=(previous.z+dz*t)/radius;
+   if(b.vy*ny+b.vz*nz<0)hit={t,ny,nz,kind:'cord'};
+  }
+ }
+ const side=Math.sign(previous.z)||-Math.sign(dz),plane=side*NET.ballRadius,t=(plane-previous.z)/dz;
+ if(t>=0&&t<=1&&side*dz<0&&Math.abs(previous.x+dx*t)<=NET.halfWidth+NET.ballRadius){
+  const y=previous.y+dy*t;
+  if(y>=NET.bottom-NET.ballRadius&&y<=NET.top&&(!hit||t<hit.t))hit={t,ny:0,nz:side,kind:'mesh'};
+ }
+ if(!hit)return null;
+ const speed=Math.hypot(b.vy,b.vz),direction=Math.sign(b.vz),vn=b.vy*hit.ny+b.vz*hit.nz;
+ const restitution=hit.kind==='cord'?.22:.08,retain=hit.kind==='cord'?.92:.48;
+ // Resolve along the round cord normal: a grazing strike keeps forward travel
+ // and can pop over; a low mesh strike loses speed and falls back naturally.
+ b.vx*=retain;b.vy=(b.vy-(1+restitution)*vn*hit.ny)*retain;b.vz=(b.vz-(1+restitution)*vn*hit.nz)*retain;
+ b.wx*=.65;b.wy*=.65;b.wz*=.65;
+ const x=previous.x+dx*hit.t;
+ b.x=x+b.vx*dt*(1-hit.t);b.y=previous.y+dy*hit.t+hit.ny*.001+b.vy*dt*(1-hit.t);b.z=previous.z+dz*hit.t+hit.nz*.001+b.vz*dt*(1-hit.t);
+ return {x,strength:Math.min(1,speed/8),direction,kind:hit.kind};
+}
 export function bounceBall(b: BallState) {
  const topspin = b.wx * Math.sign(b.vz);
  b.y = 1.58;
@@ -73,6 +105,7 @@ export function blendRotation(a: Rotation, b: Rotation, t: number): Rotation {
 }
 export class Match {
  multiplayer = false;
+ netMotion:NetMotion={sequence:0,x:0,strength:0,direction:1,age:10};
  sponges:[SpongeThickness,SpongeThickness]=[1.9,1.9];
  far = {handedness:'right' as 'left'|'right', backhand:false, body:{x:0,z:4.05}, brush:{x:0,y:0}, rotation:[0,0,0,1] as Rotation};
  impacts = [0,0];
@@ -93,6 +126,7 @@ export class Match {
  mirror() {
   for (const p of this.paddles) { p.x=-p.x; p.z=-p.z; p.vx=-p.vx; p.vz=-p.vz; }
   this.paddles.reverse();this.sponges.reverse();
+  this.netMotion.x=-this.netMotion.x;this.netMotion.direction=-this.netMotion.direction;
   const b=this.ball; b.x=-b.x; b.z=-b.z; b.vx=-b.vx; b.vz=-b.vz; b.wx=-b.wx; b.wz=-b.wz;
   [this.body,this.far.body]=[this.far.body,this.body];
   [this.brush,this.far.brush]=[this.far.brush,this.brush];
@@ -156,8 +190,10 @@ export class Match {
   b.wy = clamp(b.wy * .25 + (side === 0 ? this.brush.x : 0) * direction * gain);
   b.wz *= .25;
  }
+ letServe(){this.phase='serve';this.timer=0;this.net=false;this.serving=false;this.bounces=0;this.last=this.server;this.message='Net serve — let, serve again';}
  hit(side: Side) {
   if(this.multiplayer && side===1){this.mirror();try{this.hit(0);}finally{this.mirror();}return;}
+  if(this.serving&&this.net&&this.bounces===1&&side===other(this.last)&&Math.abs(this.ball.x)<=1.58&&Math.abs(this.ball.z)<=2.78&&this.ball.y>1.5){this.letServe();return;}
   if (side === this.last) { this.point(other(side), 'double hit'); return; }
   if (!this.bounces || (this.serving && this.bounces < 2)) { this.point(other(side), 'volley before the bounce'); return; }
   const b = this.ball; const p = this.paddles[side];
@@ -197,6 +233,7 @@ export class Match {
  player.vz = (player.z - oldPaddles[0].z) / dt;
  }
  step(dt: number, input: PlayerInput, secondInput?:PlayerInput) {
+  if(!(this.multiplayer&&this.server===1&&(this.phase==='serve'||this.phase==='toss')))this.netMotion.age+=dt;
   if(this.multiplayer && this.server===1 && (this.phase==='serve'||this.phase==='toss')){
    this.mirror();try{this.step(dt,secondInput??{x:0,y:0},input);}finally{this.mirror();}return;
   }
@@ -258,6 +295,8 @@ export class Match {
   const ai = this.paddles[1]; ai.x = move(ai.x, this.aiTarget.x, 2.6); ai.y = move(ai.y, this.aiTarget.y, 2.8);clearPaddleTable(ai);
   }
   flyBall(b, dt);
+  const netContact=collideNet(b,previous,dt);
+  if(netContact){this.net=true;this.netMotion={sequence:this.netMotion.sequence+1,x:netContact.x,strength:netContact.strength,direction:netContact.direction,age:0};if(this.serving&&this.bounces===0){this.point(other(this.last),'serve hit net before first bounce');return;}}
   // Swept plane crossings prevent fast balls skipping thin surfaces.
   if (previous.y > 1.58 && b.y <= 1.58 && b.vy < 0) {
    const t = (previous.y - 1.58) / (previous.y - b.y); const x = previous.x + (b.x - previous.x) * t; const z = previous.z + (b.z - previous.z) * t;
@@ -267,12 +306,8 @@ export class Match {
     if (side !== expected) { this.point(other(this.last), 'wrong side of the table'); return; }
     if ((!this.serving && this.bounces >= 1) || (this.serving && this.bounces >= 2)) { this.point(this.last, 'double bounce'); return; }
     this.bounces++; bounceBall(b);
-    if (this.serving && this.bounces === 2 && this.net) { this.phase = 'serve'; this.timer = 0; this.message = 'Net serve — let, serve again'; return; }
+    if (this.serving && this.bounces === 2 && this.net) { this.letServe(); return; }
    }
-  }
-  if (previous.z * b.z <= 0 && Math.abs(previous.z - b.z) > 0) {
-   const t = previous.z / (previous.z - b.z); const height = previous.y + (b.y - previous.y) * t;
-   if (height < 1.94 && Math.abs(b.x) < 1.72) { this.net = true; b.vz *= .2; b.vy *= .35; b.z = Math.sign(b.vz) * .01; }
   }
   for (const side of [0, 1] as Side[]) {
    // Contact occurs at the paddle face plus the ball radius, not its center.
