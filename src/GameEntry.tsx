@@ -1,3 +1,4 @@
+import { usesTouchControls } from './touchDevice';
 import { lazy, useState } from 'react';
 import ReleaseBadge from './ReleaseBadge';
 const App = lazy(() => import('./App')),
@@ -8,6 +9,7 @@ const App = lazy(() => import('./App')),
   Demo = lazy(() => import('./Demo')),
   Replay = lazy(() => import('./Replay'));
 export default function GameEntry() {
+  const [touchMode] = useState(usesTouchControls);
   const query = new URLSearchParams(location.search),
     initial =
       query.has('mouse') || query.has('legacy')
@@ -38,8 +40,8 @@ export default function GameEntry() {
       <p>Play the AI. First to 11, win by two.</p>
       <div>
         <button onClick={() => choose('mouse')}>
-          <strong>Mouse + keyboard</strong>
-          <span>Swing with the mouse. Move with WASD. Space to toss.</span>
+          <strong>{touchMode?'Touch controls':'Mouse + keyboard'}</strong>
+          <span>{touchMode?'Drag to swing. Use the movement wheel to move. Tap to toss.':'Swing with the mouse. Move with WASD. Space to toss.'}</span>
         </button>
         <button onClick={() => choose('webcam')}>
           <strong>Phone + webcam</strong>
@@ -49,7 +51,7 @@ export default function GameEntry() {
           </span>
         </button>
       </div>
-      <p>F fullscreen · Escape to pause</p>
+      <p>{touchMode?'Choose your playing hand before starting.':'F fullscreen · Escape to pause'}</p>
       <nav className="community-links" aria-label="Project links"><a href="https://github.com/joncady/R3F-Table-Tennis" target="_blank" rel="noreferrer">View on GitHub</a><p>Found a bug? Please <a href="https://github.com/joncady/R3F-Table-Tennis/issues/new" target="_blank" rel="noreferrer">file an issue</a> with your version, device and steps to reproduce.</p></nav>
       <ReleaseBadge />
     </main>

@@ -1,3 +1,5 @@
+import TouchControls from './TouchControls';
+import {usesTouchControls} from './touchDevice';
 import {Suspense,useEffect,useRef,useState} from 'react';
 import {Canvas} from '@react-three/fiber';
 import QRCode from 'qrcode';
@@ -8,6 +10,7 @@ type Snapshot={sequence:number;paused:boolean;started:boolean;phase:Match['phase
 const base=()=>`${location.origin}${location.pathname}`;
 const initial=new URLSearchParams(location.hash.slice(1));
 export default function Multiplayer(){
+ const [touchMode]=useState(usesTouchControls);
  const [api]=useState(()=>import.meta.env.VITE_MATCH_HTTP||(location.hostname==='127.0.0.1'||location.hostname==='localhost'?'http://127.0.0.1:8790':''));
  const [ended,setEnded]=useState(false);
  const [key,setKey]=useState(''),[error,setError]=useState(''),[status,setStatus]=useState('Create a private match or open an invite.'),[busy,setBusy]=useState(false);
@@ -69,16 +72,16 @@ export default function Multiplayer(){
    if(e.code==='KeyF'&&!e.repeat)void (document.fullscreenElement?document.exitFullscreen():surface.current?.requestFullscreen());
   };
   const keyup=(e:KeyboardEvent)=>held.delete(e.code);
-  const mouse=(e:MouseEvent)=>{if(!locked.current)return;input.current.x=Math.max(-1,Math.min(1,input.current.x+e.movementX*.009));input.current.y=Math.max(-1,Math.min(1,input.current.y-e.movementY*.009));};
-  const change=()=>{locked.current=document.pointerLockElement===surface.current;if(!locked.current){held.clear();send({type:'suspend'});}};
+  const mouse=(e:MouseEvent)=>{if(touchMode||!locked.current)return;input.current.x=Math.max(-1,Math.min(1,input.current.x+e.movementX*.009));input.current.y=Math.max(-1,Math.min(1,input.current.y-e.movementY*.009));};
+  const change=()=>{locked.current=document.pointerLockElement===surface.current;if(!locked.current&&!touchMode){held.clear();send({type:'suspend'});}};
   const blur=()=>{held.clear();send({type:'suspend'});};
   const timer=setInterval(()=>{
-   input.current.moveX=Number(held.has('KeyD'))-Number(held.has('KeyA'));input.current.moveZ=Number(held.has('KeyS'))-Number(held.has('KeyW'));
-   send({type:'input',...input.current});input.current.x*=Math.exp(-.8/60);input.current.y*=Math.exp(-2.4/60);
+   if(!touchMode){input.current.moveX=Number(held.has('KeyD'))-Number(held.has('KeyA'));input.current.moveZ=Number(held.has('KeyS'))-Number(held.has('KeyW'));}
+   send({type:'input',...input.current});if(!touchMode){input.current.x*=Math.exp(-.8/60);input.current.y*=Math.exp(-2.4/60);}
   },1000/60);
   window.addEventListener('keydown',keydown);window.addEventListener('keyup',keyup);window.addEventListener('mousemove',mouse);window.addEventListener('blur',blur);document.addEventListener('pointerlockchange',change);
   return()=>{clearInterval(timer);window.removeEventListener('keydown',keydown);window.removeEventListener('keyup',keyup);window.removeEventListener('mousemove',mouse);window.removeEventListener('blur',blur);document.removeEventListener('pointerlockchange',change);};
- },[]);
+ },[touchMode]);
  useEffect(()=>{if((snapshot?.paused||snapshot?.phase==='over')&&document.pointerLockElement)document.exitPointerLock();},[snapshot?.paused,snapshot?.phase]);
  const applySnapshot=()=>{
   const s=latest.current;if(!s)return;
@@ -90,19 +93,20 @@ export default function Multiplayer(){
   match.paddles=[side.current,other].map(i=>{const p=lerp(s.paddles[i],previous.current?.paddles[i]) as unknown as Match['paddles'][number];return {...p,x:p.x*sign,z:p.z*sign,vx:p.vx*sign,vz:p.vz*sign};});
   const player=s.players[side.current];match.body=player.body;match.brush=player.brush;match.handedness=player.handedness;match.backhand=player.backhand;match.paddleRotation=player.rotation;
   const q=s.players[other].rotation;match.far.rotation=[q[2],q[3],-q[0],-q[1]];
-  match.message=s.paused?'Both players must be ready to play':s.phase==='serve'?`${match.server===0?'Your':'Opponent’s'} serve${match.server===0?' · Space / phone Toss':''}`:s.phase==='over'?`${match.winner===0?'You win!':'Opponent wins.'}`:s.phase==='point'?'Point · next serve shortly':'Rally';
+  match.message=s.paused?'Both players must be ready to play':s.phase==='serve'?`${match.server===0?'Your':'Opponent’s'} serve${match.server===0?(touchMode?' · Tap to toss':' · Space / phone Toss'):''}`:s.phase==='over'?`${match.winner===0?'You win!':'Opponent wins.'}`:s.phase==='point'?'Point · next serve shortly':'Rally';
  };
- const ready=async()=>{setError('');try{if(mode==='mouse'){if(!surface.current?.requestPointerLock)throw Error('Mouse capture is unavailable. Open this game in Chrome.');await surface.current.requestPointerLock();}send({type:'ready'});}catch(e){setError((e as Error).message||'Mouse capture was blocked. Click Ready again.');}};
+ const ready=async()=>{setError('');try{if(mode==='mouse'&&!touchMode){if(!surface.current?.requestPointerLock)throw Error('Mouse capture is unavailable. Open this game in Chrome.');await surface.current.requestPointerLock();}send({type:'ready'});}catch(e){setError((e as Error).message||'Mouse capture was blocked. Click Ready again.');}};
  const mine=snapshot?.seats[side.current],opponent=snapshot?.seats[side.current===0?1:0];
- return <main ref={surface}>
-  <Canvas><color attach="background" args={['#102a34']}/><Suspense fallback={null}><Court match={match} input={input} update={()=>{}} cameraStrength={.65} phoneActive={false} phonePose={noPose} phoneSensitivity={2} lateralFollow={1.5} impact={()=>{}} networkFrame={applySnapshot}/></Suspense></Canvas>
+ return <main ref={surface} className={touchMode?'touch-game':undefined}>
+  <Canvas><color attach="background" args={['#102a34']}/><Suspense fallback={null}><Court steadyInput={touchMode} match={match} input={input} update={()=>{}} cameraStrength={.65} phoneActive={false} phonePose={noPose} phoneSensitivity={2} lateralFollow={1.5} impact={()=>{}} networkFrame={applySnapshot}/></Suspense></Canvas>
+  {touchMode&&mode==='mouse'&&connected&&snapshot&&!snapshot.paused&&snapshot.phase!=='over'&&<TouchControls input={input} hand={snapshot.players[side.current].handedness} serve={()=>send({type:'toss'})}/>}
   <header><div className="brand">TABLE / TENNIS<small>Private multiplayer</small></div><div className="score">YOU <b>{snapshot?.score[side.current]??0}</b> : <b>{snapshot?.score[side.current===0?1:0]??0}</b> OPPONENT</div><div className="view-controls"><button onClick={()=>send({type:'pause'})}>Pause / ready</button><button onClick={()=>{send({type:'leave'});socket.current?.close();location.href=base();}}>Leave match</button></div></header>
-  <section className="status"><h2>{match.message}</h2><p>A/D move · W/S step · Mouse swing · Space toss · F fullscreen · Esc pause</p></section>
+  <section className="status"><h2>{match.message}</h2><p>{touchMode?'Movement wheel to move · Drag to swing · Tap to toss':'A/D move · W/S step · Mouse swing · Space toss · F fullscreen · Esc pause'}</p></section>
   {(!connected||snapshot?.paused||snapshot?.phase==='over')&&<div className="overlay pairing"><article><small>PRIVATE MULTIPLAYER</small><h1>{snapshot?.phase==='over'?match.message:identity?'Your match room.':'Play together.'}</h1><p role="status">{status}</p>{error&&<p role="alert">{error}</p>}
    {ended&&<button onClick={()=>{location.href='?multiplayer';}}>Create another match</button>}
    {!identity&&<><label>Private launch key <input aria-label="Private launch key" type="password" value={key} onChange={e=>setKey(e.target.value)}/></label><button disabled={busy} onClick={()=>void create()}>Create match</button></>}
    {invite&&<p>Invite your opponent: <a href={invite}>{invite}</a><br/><button onClick={()=>void navigator.clipboard.writeText(invite)}>Copy invite</button></p>}
-   {connected&&<><p>You: {mine?.ready?'Ready':'Not ready'} · Opponent: {opponent?.connected?opponent.ready?'Ready':'Choosing controls':'Waiting to join'}</p><div className="hand-choice"><button aria-pressed={mode==='mouse'} onClick={()=>send({type:'mode',mode:'mouse'})}>Mouse + keyboard</button><button aria-pressed={mode==='phone'} onClick={()=>send({type:'mode',mode:'phone'})}>iPhone / Android</button></div>
+   {connected&&<><p>You: {mine?.ready?'Ready':'Not ready'} · Opponent: {opponent?.connected?opponent.ready?'Ready':'Choosing controls':'Waiting to join'}</p><div className="hand-choice"><button aria-pressed={mode==='mouse'} onClick={()=>send({type:'mode',mode:'mouse'})}>{touchMode?'Touch controls':'Mouse + keyboard'}</button><button aria-pressed={mode==='phone'} onClick={()=>send({type:'mode',mode:'phone'})}>iPhone / Android</button></div>
     {mode==='phone'&&<><p>{mine?.phone?'Phone paired. Keep its controller open.':'Scan with your phone, tap Connect, then calibrate.'}</p>{qr&&<img src={qr} width="180" height="180" alt="Pair your phone to your player seat"/>}<p><a href={phoneLink}>Open phone controller</a></p></>}
     <div className="hand-choice"><button onClick={()=>send({type:'hand',hand:'left'})}>Left handed</button><button onClick={()=>send({type:'hand',hand:'right'})}>Right handed</button></div>
     {snapshot?.phase==='over'?<button onClick={()=>send({type:'rematch'})}>New game</button>:<button disabled={mode==='phone'&&!mine?.phone} onClick={()=>void ready()}>Ready / resume</button>}<p>Both players must be ready. Keep this match link to reconnect; treat it like a password.</p></>}

@@ -1,14 +1,14 @@
 {
   "name": "r3f-table-tennis",
   "private": true,
-  "version": "0.2.2",
+  "version": "0.2.3",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "test": "node tests/engine.test.mjs && node tests/equipment.test.mjs && node tests/swing.test.mjs && node tests/phone-motion.test.mjs && node tests/practice-player.test.mjs && node tests/simulated-swings.test.mjs && node tests/phone-platform.test.mjs && npm run test:multiplayer",
+    "test": "node tests/engine.test.mjs && node tests/equipment.test.mjs && node tests/swing.test.mjs && node tests/phone-motion.test.mjs && node tests/practice-player.test.mjs && node tests/simulated-swings.test.mjs && node tests/phone-platform.test.mjs && npm run test:touch && npm run test:multiplayer",
     "controller": "node controller/server.mjs",
     "test:controller": "node tests/controller.test.mjs && node tests/phone-feedback.test.mjs",
     "trial:compare": "node controller/compare-tracker.mjs",
@@ -28,7 +28,8 @@
     "pose:dev": "npm run pose:prepare && vite --host 127.0.0.1 --port 5174 --strictPort",
     "test:pose": "node tests/pose.test.mjs",
     "test:webcam": "node tests/webcam.test.mjs && node tests/free-hand.test.mjs && node tests/onboarding.test.mjs && node tests/paddle-tracking.test.mjs && node tests/paddle-frame.test.mjs && node tests/orientation-trial.test.mjs && node tests/playtest-recording.test.mjs && node tests/session-marker.test.mjs",
-    "pose:analyze": "node controller/analyze-pose.mjs"
+    "pose:analyze": "node controller/analyze-pose.mjs",
+    "test:touch": "node tests/touch-controls.test.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1152.0",
