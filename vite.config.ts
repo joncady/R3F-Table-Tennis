@@ -10,6 +10,7 @@ import poseTrialPlugin from './controller/pose-trial-plugin.mjs'
 // https://vitejs.dev/config/
 export default defineConfig({
   base: '/R3F-Table-Tennis/',
+  optimizeDeps: { include: ['@mediapipe/tasks-vision', 'jsqr'] },
   define:{__APP_VERSION__:JSON.stringify(version),__BUILD_SHA__:JSON.stringify(revision)},
   plugins: [react(), poseTrialPlugin()],
 })

@@ -58,6 +58,9 @@ The game distinguishes a round top cord from the mesh: glancing cord contacts ca
 
 ## Implementation and deployment
 
+Use Node.js 22.13 or newer (`nvm use` selects Node 22). The development toolchain uses Vite 8 / React plugin 6, ESLint 10 with flat configuration, TypeScript-ESLint 8, and TypeScript 5.9. Worker dependencies are prebundled to avoid a first-use development reload.
+
+
 - `GameEntry.tsx`: two-mode launcher, lazy-loaded games and dev routes.
 - `App.tsx` / `engine.ts`: shared court rendering; fixed 120 Hz game simulation, to-11 rules, assisted AI and arcade spin. Earlier Rapier components are reference code, not the active game.
 - `WebcamGame.tsx`, `useWebcamBody.ts`, pose/hand workers: phone/webcam orchestration, local camera inference and free-hand toss.
