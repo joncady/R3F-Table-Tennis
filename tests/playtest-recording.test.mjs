@@ -127,6 +127,41 @@ assert.ok(
   outputs[3].bytes < 1024,
   "Overflow does not retain the oversized video blob",
 );
+// Once a write fails, later queued chunks must not create a corrupt gap.
+let writes = 0,
+  releaseFailure;
+const prefixStorage = {
+  async create() {
+    return { id: "prefix", mime: "video/webm" };
+  },
+  async append() {
+    writes++;
+    if (writes === 1)
+      await new Promise((_resolve, reject) => {
+        releaseFailure = () => reject(Error("Quota"));
+      });
+  },
+  async finish(_id, duration, interrupted) {
+    return {
+      id: "prefix",
+      duration,
+      status: interrupted ? "interrupted" : "complete",
+    };
+  },
+};
+await startPlaytestRecording(options, prefixStorage);
+current.ondataavailable({ data: new Blob(["first"]) });
+current.ondataavailable({ data: new Blob(["second"]) });
+await new Promise((r) => setImmediate(r));
+releaseFailure();
+await finished(5);
+assert.equal(
+  writes,
+  1,
+  "A failed chunk must not be followed by later chunks with a gap",
+);
+assert.equal(outputs[4].status, "interrupted");
+
 let stoppedOnError = false;
 const broken = {
   async create() {

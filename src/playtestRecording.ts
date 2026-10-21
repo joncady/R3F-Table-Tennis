@@ -48,6 +48,7 @@ export async function startPlaytestRecording(
   let rows: unknown[] = [],
     stopping = false,
     failed = false,
+    storageFailed = false,
     pendingBytes = 0,
     queue = Promise.resolve();
   const elapsed = () => (performance.now() - start) / 1000;
@@ -70,8 +71,12 @@ export async function startPlaytestRecording(
     }
     const duration = elapsed();
     queue = queue
-      .then(() => storage.append(saved.id, kind, blob, duration))
+      .then(() => {
+        if (!storageFailed)
+          return storage.append(saved.id, kind, blob, duration);
+      })
       .catch(() => {
+        storageFailed = true;
         if (!failed) {
           failed = true;
           options.error(
