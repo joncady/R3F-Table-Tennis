@@ -42,7 +42,7 @@ export async function phonePlayer(game,phone,{duration=60000,fullMatch=false}={}
    const s=window.__labSnapshot;if(!s||s.phase==='over')return;
    if(s.phase==='point'||(s.phase==='serve'&&s.server===0)){servePlan=null;window.labArm.x*=Math.exp(-12*dt);window.labArm.y*=Math.exp(-12*dt);if(Math.abs(window.labArm.x)<.001)window.labArm.x=0;if(Math.abs(window.labArm.y)<.001)window.labArm.y=0;if(!window.labPlayerSamples.length||s.at-window.labPlayerSamples.at(-1).at>200)window.labPlayerSamples.push({...s,arm:{...window.labArm},camera:window.labCameraMetrics});return;}
    let target={x:s.paddles[0].x,y:2.2};
-   
+
    if(s.phase==='toss')target={x:s.ball.x,y:s.timer>.48?Math.min(3.15,s.ball.y):s.ball.y-.65};
    if(s.phase==='rally'&&s.ball.vz>0){const b={...s.ball};for(let t=0;t<2&&b.z<2.95;t+=1/120){const y=b.y;flyBall(b,1/120);if(y>1.58&&b.y<=1.58&&b.vy<0&&Math.abs(b.x)<=1.58&&Math.abs(b.z)<=2.78)bounceBall(b);}target={x:b.x,y:clamp(b.y,1.5,3.1)};}
    window.labArm.x=clamp(window.labArm.x-clamp((target.x-s.paddles[0].x)*.5*dt,-.5*dt,.5*dt),-.27,.18);
