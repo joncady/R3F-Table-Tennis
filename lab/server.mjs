@@ -5,7 +5,7 @@ import {randomBytes} from 'node:crypto';
 import {readFile,stat} from 'node:fs/promises';
 import {resolve,extname} from 'node:path';
 const port=5191,origin=`http://127.0.0.1:${port}`,token=randomBytes(24).toString('hex');
-const scenarios={smoke:[],vision:['--grep','generated camera'],phone:['--grep','shipped phone'],webcam:['--grep','session alignment'],mouse:['--grep','mouse player serves'],match:['--grep','extended:']};
+const scenarios={smoke:[],alignment:['alignment.spec.mjs'],vision:['--grep','generated camera'],phone:['--grep','shipped phone'],webcam:['--grep','session alignment'],mouse:['--grep','mouse player serves'],match:['--grep','extended:']};
 let job=null,last={state:'idle',log:''};
 const escape=s=>s.replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const server=http.createServer(async(req,res)=>{

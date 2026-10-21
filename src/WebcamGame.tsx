@@ -541,7 +541,7 @@ export default function WebcamGame() {
                 </button>
                 <p>
                   {webcam.mode === "camera" && !webcam.safe
-                    ? "Finding your position…"
+                    ? webcam.trackingHint
                     : webcam.safe
                       ? "Camera tracking ready."
                       : "The game starts automatically when you’re in view."}
@@ -614,6 +614,7 @@ export default function WebcamGame() {
           <span>FIRST TO 11 · WIN BY TWO</span>
           <h2>{message}</h2>
           {notice && <p>{notice}</p>}
+          <p aria-label="Camera tracking">{webcam.safe ? "Camera tracking ready" : webcam.trackingHint}</p>
         </section>
       )}
 

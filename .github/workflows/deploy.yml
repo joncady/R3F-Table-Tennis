@@ -45,7 +45,7 @@ jobs:
           VITE_MATCH_HTTP: ${{ vars.PING_PONG_MATCH_HTTP }}
         run: npm run build
       - name: Install browser reliability runtime
-        run: npx playwright install --with-deps chromium ffmpeg
+        run: npx playwright install --with-deps chromium firefox ffmpeg
       - name: Browser reliability gate
         run: npm run test:lab
       - name: Save reliability videos and diagnostics

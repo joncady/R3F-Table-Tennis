@@ -1,5 +1,6 @@
 import {defineConfig} from '@playwright/test';
 export default defineConfig({
+ projects:[{name:'chromium',use:{browserName:'chromium'}},{name:'firefox-alignment',testMatch:'**/alignment.spec.mjs',use:{browserName:'firefox',launchOptions:{args:[]}}}],
  testDir:'./lab/tests', timeout:120_000, expect:{timeout:20_000}, workers:1,
  outputDir:'lab-results', reporter:[['list'],['html',{outputFolder:'lab-report',open:'never'}]],
  use:{baseURL:'http://127.0.0.1:5190/R3F-Table-Tennis/',viewport:{width:960,height:600},video:'on',trace:'retain-on-failure',screenshot:'only-on-failure',launchOptions:{args:['--enable-unsafe-swiftshader','--disable-background-timer-throttling','--disable-renderer-backgrounding','--autoplay-policy=no-user-gesture-required']}},

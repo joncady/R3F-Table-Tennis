@@ -105,7 +105,7 @@ Use Node 24 (`nvm use`; Node 22.13+ is supported). The lab runs locally, uses no
 
 ```sh
 npm ci
-npx playwright install chromium ffmpeg
+npx playwright install chromium firefox ffmpeg
 npm run lab:runner
 # Open http://127.0.0.1:5191
 ```
@@ -144,3 +144,9 @@ The virtual phone uses an elapsed-time serving stroke planned from measured shou
 v0.2.8 also avoids upscaling small camera frames and timestamps acquisition when capture actually begins. A phone Toss intent can wait up to 400 ms for a fresh hand sample, then expires; tracking loss, pause/disconnect, or a changed point cancels it. It never launches using an old or absent hand position. The lab's sensor preflight checks device-axis acceleration/gravity against the shipped controller, and all browser trials reject unhandled JavaScript errors.
 
 The control smoke test records whether a phone Toss was accepted or explicitly refused because tracking expired before delivery; a refusal must leave the point and contacts unchanged. Separate camera-driven serve and complete-match tests always require real paddle contacts and legal scoring. No check relaxes tracking freshness, collisions, AI behavior or scoring to make a trial pass.
+
+### Firefox alignment reliability
+
+`npm run test:lab -- alignment.spec.mjs` runs the production session scanner in Chromium and Firefox. The lab feeds real QR pixels through a canvas-backed video, module worker and jsQR, with 700 ms delivery delays. It checks rejection of other sessions and rotated markers, slow-scan verification, unreadable-marker guidance, and recovery. The local runner has an **alignment** scenario; both CI workflows install Firefox and run these checks. Other game/MediaPipe scenarios remain Chromium-only; this is not full Firefox gameplay certification.
+
+Alignment retains matching observations across brief decode misses, requires three upright readings and resets after 1.8 seconds without a valid reading. Setup guidance distinguishes small/tilted/wrong-session/unreadable markers. Body guidance uses observed shoulder visibility, framing, apparent size and capture age; lighting suggestions are advice rather than a light-quality measurement. Tracking-loss safety thresholds and toss freshness remain unchanged.

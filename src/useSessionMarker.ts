@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { MarkerGate, markerFacingCamera } from './sessionMarker';
+import { MarkerGate, markerFacingCamera, markerGuidance } from './sessionMarker';
 export default function useSessionMarker(
   video: React.RefObject<HTMLVideoElement>,
   expected: string | undefined,
@@ -17,7 +17,8 @@ export default function useSessionMarker(
       gate = new MarkerGate();
     let busy = false,
       ended = false,
-      matched = false;
+      matched = false,
+      lastMatch = -Infinity;
     setStatus(
       'Point the phone screen toward the webcam. Move it closer if the marker is small.',
     );
@@ -28,15 +29,10 @@ export default function useSessionMarker(
         setStatus('Marker scanner failed. Retry enabling webcam.');
         return;
       }
+      const now = performance.now();
       const facing = data.location && markerFacingCamera(data.location);
-      if (data.data && data.data !== expected)
-        setStatus('Different session marker. Reopen this game’s pairing link.');
-      else if (data.data === expected && !facing)
-        setStatus(
-          'Marker found. Face the screen straight at webcam, top edge up.',
-        );
-      else if (data.data === expected)
-        setStatus('Matching session. Hold steady…');
+      if (data.data === expected && facing) lastMatch = now;
+      setStatus(markerGuidance(expected, data.data, data.location, now - lastMatch));
       if (gate.update(performance.now(), expected, data.data, !!facing)) {
         matched = true;
         setStatus('Marker verified. Synchronizing phone…');
@@ -52,9 +48,9 @@ export default function useSessionMarker(
       if (ended || busy || matched || !source || source.readyState < 2) return;
       busy = true;
       void createImageBitmap(source, {
-        resizeWidth: 1280,
+        resizeWidth: Math.min(1280, source.videoWidth),
         resizeHeight: Math.round(
-          (1280 * source.videoHeight) / source.videoWidth,
+          (Math.min(1280, source.videoWidth) * source.videoHeight) / source.videoWidth,
         ),
       })
         .then((bitmap) => {
@@ -66,6 +62,7 @@ export default function useSessionMarker(
         })
         .catch(() => {
           busy = false;
+          if (!ended) setStatus("Camera frame unavailable. Check camera permission, then retry.");
         });
     }, 150);
     return () => {

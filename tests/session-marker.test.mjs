@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';import fs from 'node:fs';import ts from 'typescript';import QRCode from 'qrcode';import jsQR from 'jsqr';
 const source=ts.transpileModule(fs.readFileSync(new URL('../src/sessionMarker.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText;
-const {markerPayload,markerFacingCamera,MarkerGate}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
+const {markerPayload,markerFacingCamera,MarkerGate,markerGuidance}=await import('data:text/javascript;base64,'+Buffer.from(source).toString('base64'));
 const expected=markerPayload('012345678901234567890123','89abcdef'),code=QRCode.create(expected,{errorCorrectionLevel:'M'}),scale=6,pad=4,width=(code.modules.size+pad*2)*scale,rgba=new Uint8ClampedArray(width*width*4).fill(255);
 for(let y=0;y<width;y++)for(let x=0;x<width;x++){const mx=Math.floor(x/scale)-pad,my=Math.floor(y/scale)-pad;if(mx>=0&&my>=0&&mx<code.modules.size&&my<code.modules.size&&code.modules.get(my,mx)){const i=(y*width+x)*4;rgba[i]=rgba[i+1]=rgba[i+2]=0;}}
 const decoded=jsQR(rgba,width,width,{inversionAttempts:'dontInvert'});assert.equal(decoded.data,expected);assert.ok(markerFacingCamera(decoded.location));
@@ -24,3 +24,19 @@ tilted.update(0,expected,expected,true);tilted.update(200,expected,expected,true
 assert.equal(tilted.update(400,expected,expected,false),false);
 assert.equal(tilted.update(600,expected,expected,true),false,'tilt resets accumulated observations');
 assert.equal(tilted.update(800,expected,expected,true),false);
+
+assert.match(markerGuidance(expected,null,null,900),/briefly lost/);
+assert.match(markerGuidance(expected,null,null,1900),/not readable/);
+assert.match(markerGuidance(expected,'wrong',face,0),/Different session/);
+assert.match(markerGuidance(expected,expected,face,0),/Matching session/);
+const tiny=Object.fromEntries(Object.entries(face).map(([key,p])=>[key,{x:p.x/4,y:p.y/4}]));
+assert.match(markerGuidance(expected,expected,tiny,0),/too small/);
+
+const guidanceSource=ts.transpileModule(fs.readFileSync(new URL('../src/trackingGuidance.ts',import.meta.url),'utf8'),{compilerOptions:{module:ts.ModuleKind.ES2020}}).outputText;
+const {bodyGuidance}=await import('data:text/javascript;base64,'+Buffer.from(guidanceSource).toString('base64'));
+assert.match(bodyGuidance([],600),/delayed/);
+assert.match(bodyGuidance([],0),/both shoulders/);
+const points=[];points[11]={x:.01,y:.3,visibility:1};points[12]={x:.3,y:.3,visibility:1};
+assert.match(bodyGuidance(points,0),/camera edge/);
+points[11].x=.45;points[12].x=.49;assert.match(bodyGuidance(points,0),/closer/);
+points[12].x=.65;assert.match(bodyGuidance(points,0),/Shoulders visible/);

@@ -48,3 +48,25 @@ export class MarkerGate {
     return this.detections >= 3 && now - this.since >= 400;
   }
 }
+
+// Describe only what the scanner can establish; brightness/occlusion are advice,
+// not diagnoses. Never leave a stale “matching” message after the marker is lost.
+export function markerGuidance(
+  expected: string,
+  seen: string | null,
+  location: Parameters<typeof markerFacingCamera>[0] | null,
+  sinceMatch: number,
+) {
+  if (seen && seen !== expected) return 'Different session marker. Reopen this game’s pairing link.';
+  if (seen === expected && location) {
+    const size = Math.min(
+      Math.hypot(location.topRightCorner.x - location.topLeftCorner.x, location.topRightCorner.y - location.topLeftCorner.y),
+      Math.hypot(location.bottomLeftCorner.x - location.topLeftCorner.x, location.bottomLeftCorner.y - location.topLeftCorner.y),
+    );
+    if (size < 45) return 'Marker is too small. Move the phone closer to the webcam.';
+    if (!markerFacingCamera(location)) return 'Marker found. Face the screen straight at webcam, top edge up.';
+    return 'Matching session. Hold steady…';
+  }
+  if (sinceMatch <= 1800) return 'Marker briefly lost. Keep it facing the webcam; alignment is still in progress.';
+  return 'Marker not readable. Move closer, keep the whole marker visible, and reduce screen glare.';
+}

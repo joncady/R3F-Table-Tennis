@@ -1,4 +1,5 @@
 import {useEffect,useRef,useState} from 'react';
+import {bodyGuidance} from './trackingGuidance';
 import {BodySample,Landmark,readBody} from './poseTracking';
 import {cameraHand,CameraHand} from './paddleTracking';
 import {readTossHand,TossGesture} from './freeHand';
@@ -17,6 +18,7 @@ export default function useWebcamBody(){
  const [mode,setMode]=useState<'off'|'camera'|'replay'>('off'),[busy,setBusy]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState('Camera off. Enable webcam to begin.'),[backend,setBackend]=useState(''),[stepCm,setStepCm]=useState(40),[calibrating,setCalibrating]=useState(false),[calibrated,setCalibrated]=useState(false),[safe,setSafe]=useState(false),[confidence,setConfidence]=useState(0),[x,setX]=useState(0),[latency,setLatency]=useState(0);
  const handEvidence=useRef<{hands:Landmark[][];world?:Landmark[][];at:number}>({hands:[],at:-Infinity});
  const handPoints=useRef<Landmark[]>([]),handPointsAt=useRef(0),gesture=useRef(new TossGesture()),handedness=useRef<'left'|'right'>('left'),tossEnabled=useRef(false),handSample=useRef<{x:number;y:number;at:number}>(),tossSequence=useRef(0);
+ const [trackingHint,setTrackingHint]=useState('Keep shoulders and hands visible.');
  const [handStatus,setHandStatus]=useState('Hand detection starts with webcam'),[calibrationCue,setCalibrationCue]=useState(0);
  const gripUntil=useRef(0);
  const armed=useRef(false),visibleSince=useRef(0);
@@ -35,7 +37,7 @@ if(hands){const sample=readTossHand(hands,points,handedness.current,world);handP
   control.current={...control.current,hand:handSample.current,tossSequence:tossSequence.current,tossVelocity:gesture.current.launchSpeed};
  };
  onResult.current=(points,at,ms)=>{
-  const now=performance.now(),body=mapper.current.update(points,now,at,automatic.current);if(now-lastUi.current>=200){lastUi.current=now;setLatency(ms);setConfidence(body?.confidence||0);setX(mapper.current.x);}updateToss(points,at);paddleHand.current=cameraHand(points,handedness.current,now,video.current?.videoWidth?video.current.videoHeight/video.current.videoWidth:9/16);
+  const now=performance.now(),body=mapper.current.update(points,now,at,automatic.current);if(now-lastUi.current>=200){lastUi.current=now;setTrackingHint(bodyGuidance(points,now-at));setLatency(ms);setConfidence(body?.confidence||0);setX(mapper.current.x);}updateToss(points,at);paddleHand.current=cameraHand(points,handedness.current,now,video.current?.videoWidth?video.current.videoHeight/video.current.videoWidth:9/16);
   if(body){recent.current.push({at:now,body});recent.current=recent.current.filter(s=>now-s.at<1600);}else if(now-mapper.current.lastGood>500)recent.current=[];
   if(automatic.current&&!mapper.current.calibration&&recent.current.length>=8){
    mapper.current.calibration=estimateCalibration(recent.current.map(s=>s.body));mapper.current.x=0;setCalibrated(true);setStatus('Camera aligned. Ready to play.');
@@ -104,6 +106,6 @@ if(hands){const sample=readTossHand(hands,points,handedness.current,world);handP
   return()=>{clearInterval(timer);document.removeEventListener('visibilitychange',hidden);refs.generation.current++;cancelAnimationFrame(refs.frame.current);refs.worker.current?.terminate();refs.stream.current?.getTracks().forEach(t=>t.stop());};
  // Own the latest device/worker resources without restarting capture on UI changes.
  },[]);
- return {autoAlign,quickMode,setQuickMode,checkModels,handedness,tossEnabled,handStatus,calibrationCue,video,canvas,control,mode,busy,error,status,backend,stepCm,setStepCm,calibrating,calibrated,safe,confidence,x,latency,start,stop,calibrate,loadReplay};
+ return {trackingHint,autoAlign,quickMode,setQuickMode,checkModels,handedness,tossEnabled,handStatus,calibrationCue,video,canvas,control,mode,busy,error,status,backend,stepCm,setStepCm,calibrating,calibrated,safe,confidence,x,latency,start,stop,calibrate,loadReplay};
 }
 export type WebcamBodyController=ReturnType<typeof useWebcamBody>;
